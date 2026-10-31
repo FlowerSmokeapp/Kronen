@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#5b3df5">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="KRONEN">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<title>KRONEN – budget for unge</title>
+<style>
+:root{
+  --bg:#f6f4ef; --card:#fff; --ink:#1d1b26; --muted:#6b6878; --line:#e7e3da;
+  --brand:#5b3df5; --brand2:#ff8a3d; --ok:#17a673; --warn:#f2a900; --bad:#e5484d;
+  --radius:18px;
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#121119;--card:#1c1a26;--ink:#f1eff7;--muted:#a19dae;--line:#2c2938}
+}
+*{box-sizing:border-box}
+html,body{overscroll-behavior-y:none}
+body{margin:0;-webkit-tap-highlight-color:transparent;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased}
+.app{max-width:480px;margin:0 auto;padding:calc(16px + env(safe-area-inset-top)) 16px calc(110px + env(safe-area-inset-bottom));min-height:100vh}
+header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.logo{font-weight:900;letter-spacing:.08em;font-size:20px}
+.logo span{color:var(--brand)}
+.pill{border:0;border-radius:999px;padding:7px 12px;font-weight:700;font-size:13px;cursor:pointer;background:var(--card);color:var(--ink);box-shadow:0 0 0 1px var(--line)}
+.pill.prem{background:linear-gradient(135deg,var(--brand),#8a5bff);color:#fff;box-shadow:none}
+.card{background:var(--card);border-radius:var(--radius);padding:16px;margin:12px 0;box-shadow:0 1px 0 var(--line)}
+h2{font-size:15px;margin:0 0 10px;display:flex;justify-content:space-between;align-items:center}
+h2 small{font-weight:500;color:var(--muted);font-size:12px}
+.ringwrap{display:flex;flex-direction:column;align-items:center;padding:12px 0 4px}
+.ring{position:relative;width:260px;height:260px}
+.ring svg{width:100%;height:100%;transform:rotate(-90deg)}
+.ring .center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+.ring .amt{font-size:42px;font-weight:900;letter-spacing:-.02em}
+.ring .lbl{color:var(--muted);font-size:13px}
+.ring .sub{font-size:12px;color:var(--muted);margin-top:6px}
+.month{font-weight:700;color:var(--muted);font-size:13px;text-transform:capitalize}
+.alert{border-radius:14px;padding:10px 12px;margin:8px 0;font-size:14px;display:flex;gap:8px;align-items:flex-start}
+.alert.warn{background:#fff4d6;color:#7a5400}
+.alert.bad{background:#ffe1e2;color:#8a1c20}
+.alert.info{background:#ece8ff;color:#3a2a9c}
+@media (prefers-color-scheme:dark){.alert.warn{background:#3a2f0e;color:#ffd977}.alert.bad{background:#3d1517;color:#ffb3b5}.alert.info{background:#262046;color:#c8bdff}}
+.row{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
+.row:first-of-type{border-top:0}
+.row .grow{flex:1;min-width:0}
+.row .t{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .s{font-size:12px;color:var(--muted)}
+.row .v{font-weight:700;font-variant-numeric:tabular-nums}
+.dot{width:12px;height:12px;border-radius:50%;flex:none}
+.x{border:0;background:none;color:var(--muted);cursor:pointer;font-size:18px;padding:2px 6px}
+.bar{height:8px;border-radius:99px;background:var(--line);overflow:hidden;margin-top:6px}
+.bar i{display:block;height:100%;border-radius:99px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stat{background:var(--bg);border-radius:14px;padding:10px 12px}
+.stat b{display:block;font-size:18px;font-variant-numeric:tabular-nums}
+.stat span{font-size:12px;color:var(--muted)}
+nav{position:fixed;bottom:0;left:0;right:0;background:var(--card);border-top:1px solid var(--line);display:flex;justify-content:center}
+nav .in{display:flex;max-width:480px;width:100%}
+nav{padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;border:0;background:none;padding:10px 0 14px;font-size:11px;color:var(--muted);cursor:pointer;font-weight:600}
+nav button .ic{display:block;font-size:20px;margin-bottom:2px}
+nav button.on{color:var(--brand)}
+.fab{position:fixed;right:max(16px,calc(50% - 224px));bottom:calc(78px + env(safe-area-inset-bottom));width:58px;height:58px;border-radius:50%;border:0;background:var(--brand);color:#fff;font-size:30px;box-shadow:0 8px 24px rgba(91,61,245,.4);cursor:pointer}
+.btn{border:0;border-radius:12px;padding:11px 14px;font-weight:700;cursor:pointer;background:var(--brand);color:#fff;font-size:14px}
+.btn.ghost{background:var(--bg);color:var(--ink)}
+.btn.small{padding:7px 10px;font-size:13px}
+.btn:disabled{opacity:.5}
+form{display:flex;flex-direction:column;gap:10px}
+label{font-size:12px;color:var(--muted);font-weight:600;display:flex;flex-direction:column;gap:4px}
+input,select{font:inherit;padding:11px 12px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}
+.seg{display:flex;background:var(--bg);border-radius:12px;padding:3px}
+.seg button{flex:1;border:0;background:none;padding:8px;border-radius:10px;font-weight:700;cursor:pointer;color:var(--muted);font-size:13px}
+.seg button.on{background:var(--card);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.modal{position:fixed;inset:0;background:rgba(15,12,30,.5);display:none;align-items:flex-end;justify-content:center;z-index:20}
+.modal.open{display:flex}
+.sheet{background:var(--card);width:100%;max-width:480px;border-radius:22px 22px 0 0;padding:18px 16px calc(28px + env(safe-area-inset-bottom));max-height:90vh;overflow:auto}
+.sheet h3{margin:0 0 12px}
+.lock{display:flex;align-items:center;gap:6px;color:var(--brand);font-weight:700;font-size:12px}
+.locked{position:relative;filter:blur(3px);pointer-events:none;user-select:none;opacity:.6}
+.lockover{text-align:center;padding:12px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:150px;background:var(--ink);color:var(--bg);padding:10px 14px;border-radius:12px;font-size:14px;opacity:0;transition:.25s;pointer-events:none;z-index:30;max-width:90%}
+.toast.show{opacity:1}
+.legend{display:flex;flex-wrap:wrap;gap:8px 14px;font-size:12px;color:var(--muted);margin-top:8px}
+.legend span{display:flex;align-items:center;gap:6px}
+.empty{color:var(--muted);font-size:14px;padding:6px 0}
+textarea{width:100%;height:140px;font:12px ui-monospace,monospace;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);padding:10px}
+.feat{display:flex;gap:10px;padding:8px 0;font-size:14px}
+.chart text{fill:var(--muted);font-size:10px}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="logo">KRO<span>N</span>EN</div>
+    <button class="pill" id="premBtn"></button>
+  </header>
+  <div id="install"></div>
+  <main id="view"></main>
+</div>
+<button class="fab" id="fab" aria-label="Tilføj udgift">+</button>
+<nav><div class="in">
+  <button data-v="hjem" class="on"><span class="ic">◯</span>Hjem</button>
+  <button data-v="budget"><span class="ic">☰</span>Budget</button>
+  <button data-v="maal"><span class="ic">★</span>Sparemål</button>
+  <button data-v="rapport"><span class="ic">▤</span>Rapport</button>
+</div></nav>
+<div class="modal" id="modal"><div class="sheet" id="sheet"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const PALETTE=['#5b3df5','#ff8a3d','#17a673','#e5484d','#0ea5e9','#d946ef','#a3a01d','#64748b'];
+const FREE={cats:3,goals:1};
+const today=new Date();
+const ym=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+const curYM=ym(today);
+const uid=()=>Math.random().toString(36).slice(2,9);
+const kr=n=>new Intl.NumberFormat('da-DK',{maximumFractionDigits:0}).format(Math.round(n))+' kr.';
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const monthName=(y,m)=>new Date(y,m,1).toLocaleDateString('da-DK',{month:'long',year:'numeric'});
+
+function seed(){
+  const cats=[{id:'c1',name:'Mad & snacks',limit:900,color:PALETTE[0]},{id:'c2',name:'Tøj',limit:500,color:PALETTE[1]},{id:'c3',name:'Fritid',limit:600,color:PALETTE[2]}];
+  const tx=[];
+  const notes={c1:['Netto','Kantine','Pizza','7-Eleven'],c2:['Sneakers','H&M','Hoodie'],c3:['Biograf','Koncert','Bowling','Spil']};
+  for(let back=9;back>=0;back--){
+    const d=new Date(today.getFullYear(),today.getMonth()-back,1);
+    const maxDay=back===0?today.getDate():28;
+    const n=back===0?7:9+Math.floor(Math.random()*5);
+    for(let i=0;i<n;i++){
+      const c=cats[Math.floor(Math.random()*3)];
+      const day=1+Math.floor(Math.random()*maxDay);
+      tx.push({id:uid(),date:ym(d)+'-'+String(day).padStart(2,'0'),cat:c.id,amount:40+Math.round(Math.random()*220),note:notes[c.id][Math.floor(Math.random()*notes[c.id].length)]});
+    }
+  }
+  return {premium:false,
+    incomes:[{id:uid(),name:'Løn – fritidsjob',kind:'Løn',amount:3200},{id:uid(),name:'Lommepenge',kind:'Lommepenge',amount:500}],
+    fixed:[{id:uid(),name:'Telefon',amount:129,day:5},{id:uid(),name:'Spotify',amount:59,day:12},{id:uid(),name:'Netflix',amount:89,day:Math.min(28,today.getDate()+3)}],
+    cats,tx,goals:[{id:uid(),name:'Ny telefon',target:4000,saved:1350,deposits:[]}]};
+}
+let S;
+try{S=JSON.parse(localStorage.getItem('kronen'))}catch(e){}
+if(!S||!S.cats)S=seed();
+function save(){try{localStorage.setItem('kronen',JSON.stringify(S))}catch(e){}}
+
+// ---------- beregninger ----------
+const incomeTotal=()=>S.incomes.reduce((a,b)=>a+b.amount,0);
+const fixedTotal=()=>S.fixed.reduce((a,b)=>a+b.amount,0);
+const txIn=m=>S.tx.filter(t=>t.date.startsWith(m));
+const spentCat=(c,m=curYM)=>txIn(m).filter(t=>t.cat===c).reduce((a,b)=>a+b.amount,0);
+const savedIn=m=>S.goals.flatMap(g=>g.deposits||[]).filter(d=>d.date.startsWith(m)).reduce((a,b)=>a+b.amount,0);
+function monthSummary(m){
+  const inc=incomeTotal(), fix=fixedTotal(), var_=txIn(m).reduce((a,b)=>a+b.amount,0), sav=savedIn(m);
+  return {inc,fix,var:var_,sav,left:inc-fix-var_-sav};
+}
+function warnings(){
+  const w=[]; const s=monthSummary(curYM);
+  const dim=new Date(today.getFullYear(),today.getMonth()+1,0).getDate();
+  if(s.left<0) w.push(['bad','Du har brugt '+kr(-s.left)+' mere, end du har denne måned.']);
+  else if(s.left<s.inc*0.15) w.push(['warn','Pas på! Du har kun '+kr(s.left)+' tilbage – og der er '+(dim-today.getDate())+' dage til næste måned.']);
+  S.cats.forEach(c=>{const sp=spentCat(c.id);
+    if(c.limit&&sp>c.limit) w.push(['bad','<b>'+esc(c.name)+'</b>: Du er '+kr(sp-c.limit)+' over din grænse.']);
+    else if(c.limit&&sp>c.limit*0.8) w.push(['warn','<b>'+esc(c.name)+'</b>: Du har brugt '+Math.round(sp/c.limit*100)+' % af grænsen.']);
+  });
+  return w;
+}
+function upcoming(){
+  const d=today.getDate();
+  return S.fixed.map(f=>{let diff=f.day-d; if(diff<0) diff+=new Date(today.getFullYear(),today.getMonth()+1,0).getDate(); return {...f,diff}})
+    .filter(f=>f.diff<=7).sort((a,b)=>a.diff-b.diff);
+}
+
+// ---------- UI-hjælpere ----------
+let view=(location.hash||'#hjem').slice(1);
+if(!['hjem','budget','maal','rapport'].includes(view)) view='hjem';
+const $=s=>document.querySelector(s);
+function toast(msg){const t=$('#toast');t.innerHTML=msg;t.classList.add('show');clearTimeout(toast._t);toast._t=setTimeout(()=>t.classList.remove('show'),2800)}
+function openSheet(html){$('#sheet').innerHTML=html;$('#modal').classList.add('open')}
+function closeSheet(){$('#modal').classList.remove('open')}
+$('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeSheet()});
+function lockBox(feature){return `<div class="lockover"><div class="lock" style="justify-content:center">🔒 ${feature} er en Premium-funktion</div><p class="s" style="color:var(--muted);font-size:13px">Få det for 29 kr./md.</p><button class="btn small" onclick="premiumSheet()">Se Premium</button></div>`}
+
+function render(){
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===view));
+  const pb=$('#premBtn'); pb.className='pill'+(S.premium?' prem':''); pb.textContent=S.premium?'★ Premium':'Gratis · Opgrader';
+  $('#view').innerHTML=({hjem:vHome,budget:vBudget,maal:vGoals,rapport:vReport})[view]();
+  $('#fab').style.display=(view==='maal')?'none':'block';
+}
+function go(v){view=v;history.replaceState(null,'','#'+v);render();window.scrollTo(0,0)}
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>go(b.dataset.v));
+window.addEventListener('hashchange',()=>{const v=location.hash.slice(1);if(['hjem','budget','maal','rapport'].includes(v)){view=v;render()}});
+
+// ---------- Forside ----------
+function vHome(){
+  const s=monthSummary(curYM);
+  const pct=s.inc>0?Math.max(0,Math.min(1,s.left/s.inc)):0;
+  const col=s.left<0?'var(--bad)':pct<.15?'var(--warn)':pct<.4?'var(--brand2)':'var(--ok)';
+  const R=112,C=2*Math.PI*R;
+  const dim=new Date(today.getFullYear(),today.getMonth()+1,0).getDate();
+  const daysLeft=dim-today.getDate()+1;
+  const perDay=s.left>0?s.left/daysLeft:0;
+  const w=warnings();
+  const up=upcoming();
+  const recent=[...txIn(curYM)].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,5);
+  return `
+  <div class="card ringwrap">
+    <div class="month">${monthName(today.getFullYear(),today.getMonth())}</div>
+    <div class="ring">
+      <svg viewBox="0 0 260 260"><circle cx="130" cy="130" r="${R}" fill="none" stroke="var(--line)" stroke-width="20"/>
+      <circle cx="130" cy="130" r="${R}" fill="none" stroke="${col}" stroke-width="20" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C*(1-pct)}" style="transition:stroke-dashoffset .6s"/></svg>
+      <div class="center">
+        <div class="lbl">Tilbage denne måned</div>
+        <div class="amt" style="color:${s.left<0?'var(--bad)':'inherit'}">${kr(s.left)}</div>
+        <div class="sub">${s.left>0?'≈ '+kr(perDay)+' om dagen i '+daysLeft+(daysLeft===1?' dag':' dage'):'Ingen penge tilbage'}</div>
+      </div>
+    </div>
+    <div class="grid2" style="width:100%;margin-top:8px">
+      <div class="stat"><span>Indtægter</span><b>${kr(s.inc)}</b></div>
+      <div class="stat"><span>Brugt + faste + sparet</span><b>${kr(s.fix+s.var+s.sav)}</b></div>
+    </div>
+  </div>
+  ${w.map(x=>`<div class="alert ${x[0]}">⚠️ <div>${x[1]}</div></div>`).join('')}
+  <div class="card">
+    <h2>Påmindelser <small>${S.premium?'Næste 7 dage':'<span class="lock">🔒 Premium</span>'}</small></h2>
+    ${S.premium?(up.length?up.map(f=>`<div class="row"><div class="dot" style="background:var(--brand2)"></div><div class="grow"><div class="t">${esc(f.name)}</div><div class="s">${f.diff===0?'Trækkes i dag':f.diff===1?'Trækkes i morgen':'Trækkes om '+f.diff+' dage'} (d. ${f.day}.)</div></div><div class="v">${kr(f.amount)}</div></div>`).join(''):'<div class="empty">Ingen faste udgifter de næste 7 dage. 🎉</div>')
+      :`<div class="empty">Få besked, før dine abonnementer og telefonregning bliver trukket. <a href="#" onclick="premiumSheet();return false" style="color:var(--brand);font-weight:700">Se Premium</a></div>`}
+  </div>
+  <div class="card">
+    <h2>Seneste køb <small><a href="#budget" style="color:var(--brand)">Se alle</a></small></h2>
+    ${recent.length?recent.map(txRow).join(''):'<div class="empty">Ingen køb endnu. Tryk på + for at tilføje.</div>'}
+  </div>`;
+}
+function txRow(t){
+  const c=S.cats.find(c=>c.id===t.cat)||{name:'Ukendt',color:'#999'};
+  const d=new Date(t.date);
+  return `<div class="row"><div class="dot" style="background:${c.color}"></div><div class="grow"><div class="t">${esc(t.note||c.name)}</div><div class="s">${esc(c.name)} · ${d.getDate()}/${d.getMonth()+1}</div></div><div class="v">−${kr(t.amount)}</div><button class="x" onclick="delTx('${t.id}')" aria-label="Slet">×</button></div>`;
+}
+
+// ---------- Budget ----------
+let budgetTab='kategorier';
+function vBudget(){
+  const tabs=['kategorier','indtægter','faste','køb'];
+  const names={kategorier:'Kategorier','indtægter':'Indtægter',faste:'Faste',køb:'Køb'};
+  let body='';
+  if(budgetTab==='kategorier'){
+    const atMax=!S.premium&&S.cats.length>=FREE.cats;
+    body=`<h2>Kategorier <small>${S.premium?'Ubegrænset':S.cats.length+' / '+FREE.cats+' (gratis)'}</small></h2>
+    ${S.cats.map(c=>{const sp=spentCat(c.id);const p=c.limit?Math.min(100,sp/c.limit*100):0;const over=c.limit&&sp>c.limit;
+      return `<div class="row" style="flex-wrap:wrap"><div class="dot" style="background:${c.color}"></div><div class="grow"><div class="t">${esc(c.name)}</div><div class="s">${kr(sp)} af ${c.limit?kr(c.limit):'ingen grænse'}</div>
+      <div class="bar"><i style="width:${p}%;background:${over?'var(--bad)':p>80?'var(--warn)':c.color}"></i></div></div><button class="x" onclick="catSheet('${c.id}')" aria-label="Rediger">✎</button></div>`}).join('')}
+    <div style="margin-top:12px">${atMax?`<div class="alert info">🔒 Gratis-versionen har 3 kategorier. <a href="#" onclick="premiumSheet();return false" style="color:inherit;font-weight:700">Opgrader for flere</a></div>`:`<button class="btn ghost" onclick="catSheet()">+ Ny kategori</button>`}</div>`;
+  } else if(budgetTab==='indtægter'){
+    body=`<h2>Indtægter <small>pr. måned</small></h2>
+    ${S.incomes.map(i=>`<div class="row"><div class="dot" style="background:var(--ok)"></div><div class="grow"><div class="t">${esc(i.name)}</div><div class="s">${esc(i.kind)}</div></div><div class="v">+${kr(i.amount)}</div><button class="x" onclick="delItem('incomes','${i.id}')">×</button></div>`).join('')||'<div class="empty">Ingen indtægter endnu.</div>'}
+    <form onsubmit="addIncome(event)" style="margin-top:12px">
+      <div class="grid2"><label>Type<select name="kind"><option>Løn</option><option>Lommepenge</option><option>SU</option><option>Andet</option></select></label>
+      <label>Beløb (kr.)<input name="amount" type="number" min="1" required inputmode="numeric"></label></div>
+      <label>Navn<input name="name" placeholder="Fx fritidsjob i Netto"></label>
+      <button class="btn">Tilføj indtægt</button></form>`;
+  } else if(budgetTab==='faste'){
+    body=`<h2>Faste udgifter <small>${kr(fixedTotal())}/md.</small></h2>
+    ${S.fixed.map(f=>`<div class="row"><div class="dot" style="background:var(--brand2)"></div><div class="grow"><div class="t">${esc(f.name)}</div><div class="s">Trækkes d. ${f.day}. hver måned</div></div><div class="v">−${kr(f.amount)}</div><button class="x" onclick="delItem('fixed','${f.id}')">×</button></div>`).join('')||'<div class="empty">Ingen faste udgifter.</div>'}
+    <form onsubmit="addFixed(event)" style="margin-top:12px">
+      <label>Navn<input name="name" required placeholder="Fx telefon, Spotify, fitness"></label>
+      <div class="grid2"><label>Beløb (kr.)<input name="amount" type="number" min="1" required inputmode="numeric"></label>
+      <label>Dag i måneden<input name="day" type="number" min="1" max="28" value="1" required></label></div>
+      <button class="btn">Tilføj fast udgift</button></form>`;
+  } else {
+    const list=[...txIn(curYM)].sort((a,b)=>b.date.localeCompare(a.date));
+    body=`<h2>Køb denne måned <small>${list.length} stk.</small></h2>${list.map(txRow).join('')||'<div class="empty">Ingen køb endnu.</div>'}`;
+  }
+  return `<div class="seg" style="margin-top:6px">${tabs.map(t=>`<button class="${t===budgetTab?'on':''}" onclick="budgetTab='${t}';render()">${names[t]}</button>`).join('')}</div>
+  <div class="card">${body}</div>
+  ${S.premium?'':`<div class="alert info">Gratis: 1 budget og 3 kategorier.</div>`}`;
+}
+function addIncome(e){e.preventDefault();const f=new FormData(e.target);S.incomes.push({id:uid(),kind:f.get('kind'),name:f.get('name')||f.get('kind'),amount:+f.get('amount')});save();render();toast('Indtægt tilføjet 💰')}
+function addFixed(e){e.preventDefault();const f=new FormData(e.target);S.fixed.push({id:uid(),name:f.get('name'),amount:+f.get('amount'),day:+f.get('day')});save();render();toast('Fast udgift tilføjet')}
+function delItem(k,id){S[k]=S[k].filter(x=>x.id!==id);save();render()}
+function delTx(id){S.tx=S.tx.filter(x=>x.id!==id);save();render();toast('Køb slettet')}
+function catSheet(id){
+  const c=S.cats.find(c=>c.id===id)||{name:'',limit:'',color:PALETTE[S.cats.length%PALETTE.length]};
+  openSheet(`<h3>${id?'Rediger kategori':'Ny kategori'}</h3>
+  <form onsubmit="saveCat(event,'${id||''}')">
+    <label>Navn<input name="name" required value="${esc(c.name)}" placeholder="Fx transport"></label>
+    <label>Grænse pr. måned (kr.) – du får en advarsel, når du nærmer dig<input name="limit" type="number" min="0" value="${c.limit}"></label>
+    <label>Farve<div style="display:flex;gap:8px">${PALETTE.map(p=>`<label style="flex-direction:row"><input type="radio" name="color" value="${p}" ${p===c.color?'checked':''} style="display:none"><span class="dot" style="width:28px;height:28px;background:${p};outline:${p===c.color?'3px solid var(--ink)':'none'};outline-offset:2px;cursor:pointer" onclick="this.parentNode.parentNode.querySelectorAll('.dot').forEach(d=>d.style.outline='none');this.style.outline='3px solid var(--ink)'"></span></label>`).join('')}</div></label>
+    <button class="btn">Gem</button>
+    ${id&&S.cats.length>1?`<button type="button" class="btn ghost" onclick="delCat('${id}')">Slet kategori</button>`:''}
+  </form>`);
+}
+function saveCat(e,id){e.preventDefault();const f=new FormData(e.target);const d={name:f.get('name'),limit:+f.get('limit')||0,color:f.get('color')||PALETTE[0]};
+  if(id)Object.assign(S.cats.find(c=>c.id===id),d);else S.cats.push({id:uid(),...d});save();closeSheet();render()}
+function delCat(id){const other=S.cats.find(c=>c.id!==id);S.tx.forEach(t=>{if(t.cat===id)t.cat=other.id});S.cats=S.cats.filter(c=>c.id!==id);save();closeSheet();render();toast('Køb flyttet til '+esc(other.name))}
+
+// ---------- Tilføj køb ----------
+$('#fab').onclick=()=>{
+  openSheet(`<h3>Nyt køb</h3>
+  <form onsubmit="addTx(event)">
+    <label>Beløb (kr.)<input name="amount" type="number" min="1" required inputmode="numeric" autofocus style="font-size:28px;font-weight:800"></label>
+    <label>Kategori<select name="cat">${S.cats.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select></label>
+    <label>Hvad købte du?<input name="note" placeholder="Fx burger med vennerne"></label>
+    <label>Dato<input name="date" type="date" value="${today.toISOString().slice(0,10)}"></label>
+    <button class="btn">Tilføj</button></form>`);
+  setTimeout(()=>$('#sheet input').focus(),50);
+};
+function addTx(e){
+  e.preventDefault();const f=new FormData(e.target);
+  const t={id:uid(),amount:+f.get('amount'),cat:f.get('cat'),note:f.get('note'),date:f.get('date')||today.toISOString().slice(0,10)};
+  const c=S.cats.find(c=>c.id===t.cat);const before=spentCat(c.id);
+  S.tx.push(t);save();closeSheet();render();
+  const after=spentCat(c.id);const left=monthSummary(curYM).left;
+  if(c.limit&&after>c.limit&&before<=c.limit) toast('🚨 Du er nu over din grænse for '+esc(c.name)+'!');
+  else if(c.limit&&after>c.limit*.8&&before<=c.limit*.8) toast('⚠️ Du har brugt over 80 % af '+esc(c.name));
+  else if(left<0) toast('🚨 Du har brugt mere, end du har');
+  else toast('Tilføjet · '+kr(left)+' tilbage');
+}
+
+// ---------- Sparemål ----------
+function vGoals(){
+  const atMax=!S.premium&&S.goals.length>=FREE.goals;
+  return `<div class="card"><h2>Sparemål <small>${S.premium?'Ubegrænset':S.goals.length+' / '+FREE.goals+' (gratis)'}</small></h2>
+  ${S.goals.map(g=>{const p=Math.min(100,g.saved/g.target*100);return `<div class="row" style="flex-wrap:wrap;padding:14px 0"><div class="grow">
+    <div style="display:flex;justify-content:space-between"><div class="t">⭐ ${esc(g.name)}</div><div class="v">${Math.round(p)} %</div></div>
+    <div class="s">${kr(g.saved)} af ${kr(g.target)} · mangler ${kr(Math.max(0,g.target-g.saved))}</div>
+    <div class="bar" style="height:12px"><i style="width:${p}%;background:linear-gradient(90deg,var(--brand),var(--brand2))"></i></div>
+    <div style="display:flex;gap:8px;margin-top:10px">${[50,100,250].map(a=>`<button class="btn small ghost" onclick="deposit('${g.id}',${a})">+${a} kr.</button>`).join('')}<button class="x" onclick="delItem('goals','${g.id}')" style="margin-left:auto">Slet</button></div>
+  </div></div>`}).join('')||'<div class="empty">Ingen sparemål endnu.</div>'}
+  </div>
+  <div class="card">${atMax?`<h2>Flere sparemål</h2><div class="empty">Gratis-versionen har 1 sparemål. Med Premium kan du spare op til både telefon, festival og kørekort på én gang.</div><button class="btn" style="margin-top:8px" onclick="premiumSheet()">Opgrader – 29 kr./md.</button>`:
+  `<h2>Nyt sparemål</h2><form onsubmit="addGoal(event)"><label>Hvad sparer du op til?<input name="name" required placeholder="Fx ny telefon"></label><label>Mål (kr.)<input name="target" type="number" min="1" required></label><button class="btn">Opret sparemål</button></form>`}</div>
+  <div class="alert info">💡 Når du lægger penge til side, trækkes de fra "tilbage denne måned".</div>`;
+}
+function addGoal(e){e.preventDefault();const f=new FormData(e.target);S.goals.push({id:uid(),name:f.get('name'),target:+f.get('target'),saved:0,deposits:[]});save();render();toast('Sparemål oprettet ⭐')}
+function deposit(id,a){const g=S.goals.find(g=>g.id===id);g.saved+=a;(g.deposits=g.deposits||[]).push({amount:a,date:today.toISOString().slice(0,10)});save();render();
+  toast(g.saved>=g.target?'🎉 Du har nået dit mål: '+esc(g.name)+'!':'+'+a+' kr. til '+esc(g.name))}
+
+// ---------- Rapport ----------
+let repOffset=0;
+function vReport(){
+  const d=new Date(today.getFullYear(),today.getMonth()+repOffset,1);const m=ym(d);
+  const s=monthSummary(m);
+  const parts=S.cats.map(c=>({c,v:spentCat(c.id,m)})).filter(p=>p.v>0);
+  if(s.fix) parts.push({c:{name:'Faste udgifter',color:'#94a3b8'},v:s.fix});
+  const tot=parts.reduce((a,b)=>a+b.v,0);
+  // donut
+  let ang=0;const R=80,cx=100,cy=100;
+  const arcs=parts.map(p=>{const a0=ang,a1=ang+p.v/tot*Math.PI*2;ang=a1;const gap=parts.length>1?.02:0;
+    const large=(a1-a0)>Math.PI?1:0;const P=a=>[cx+R*Math.sin(a),cy-R*Math.cos(a)];
+    const [x0,y0]=P(a0+gap),[x1,y1]=P(a1-gap);
+    return parts.length===1?`<circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="${p.c.color}" stroke-width="30"><title>${esc(p.c.name)}: ${kr(p.v)}</title></circle>`
+      :`<path d="M${x0},${y0} A${R},${R} 0 ${large} 1 ${x1},${y1}" fill="none" stroke="${p.c.color}" stroke-width="30"><title>${esc(p.c.name)}: ${kr(p.v)}</title></path>`}).join('');
+  const monthCard=`<div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+      <button class="x" onclick="repOffset--;render()">‹</button><div class="month" style="font-size:15px;color:var(--ink)">${monthName(d.getFullYear(),d.getMonth())}</div>
+      <button class="x" onclick="if(repOffset<0){repOffset++;render()}" ${repOffset>=0?'style="opacity:.3"':''}>›</button></div>
+    <h2>Månedsrapport</h2>
+    ${tot?`<div style="display:flex;justify-content:center"><svg viewBox="0 0 200 200" width="220" height="220">${arcs}
+      <text x="100" y="96" text-anchor="middle" style="fill:var(--muted);font-size:11px">Brugt i alt</text>
+      <text x="100" y="116" text-anchor="middle" style="fill:var(--ink);font-size:18px;font-weight:800">${kr(tot)}</text></svg></div>
+    ${parts.sort((a,b)=>b.v-a.v).map(p=>`<div class="row"><div class="dot" style="background:${p.c.color}"></div><div class="grow"><div class="t">${esc(p.c.name)}</div></div><div class="s">${Math.round(p.v/tot*100)} %</div><div class="v" style="min-width:80px;text-align:right">${kr(p.v)}</div></div>`).join('')}`:'<div class="empty">Ingen udgifter denne måned.</div>'}
+    <div class="grid2" style="margin-top:10px"><div class="stat"><span>Indtægter</span><b>${kr(s.inc)}</b></div><div class="stat"><span>${s.left>=0?'Overskud':'Underskud'}</span><b style="color:${s.left>=0?'var(--ok)':'var(--bad)'}">${kr(s.left)}</b></div></div>
+  </div>`;
+  // år
+  const months=[];for(let i=0;i<12;i++){const dm=new Date(today.getFullYear(),i,1);const k=ym(dm);const future=dm>today;
+    const hasData=S.tx.some(t=>t.date.startsWith(k));const ms=monthSummary(k);months.push({i,k,future,spent:(future||!hasData&&k!==curYM)?0:ms.fix+ms.var,inc:ms.inc})}
+  const max=Math.max(incomeTotal(),...months.map(m=>m.spent))*1.1||1;
+  const W=320,H=150,bw=W/12;
+  const yIn=H-incomeTotal()/max*H;
+  const bars=months.map(m=>{const h=m.spent/max*H;const over=m.spent>m.inc;
+    return `<rect x="${m.i*bw+4}" y="${H-h}" width="${bw-8}" height="${h}" rx="3" fill="${m.k===curYM?'var(--brand)':over?'var(--bad)':'#a99bfb'}"><title>${monthName(today.getFullYear(),m.i)}: ${kr(m.spent)}</title></rect>
+    <text x="${m.i*bw+bw/2}" y="${H+13}" text-anchor="middle">${new Date(2000,m.i,1).toLocaleDateString('da-DK',{month:'short'}).replace('.','')}</text>`}).join('');
+  const active=months.filter(m=>m.spent>0);
+  const yearSpent=active.reduce((a,b)=>a+b.spent,0), yearInc=active.length*incomeTotal();
+  const yearInner=`<svg class="chart" viewBox="0 0 ${W} ${H+18}" width="100%">${bars}
+      <line x1="0" x2="${W}" y1="${yIn}" y2="${yIn}" stroke="var(--ok)" stroke-dasharray="4 3" stroke-width="1.5"/></svg>
+    <div class="legend"><span><i class="dot" style="background:#a99bfb"></i>Udgifter</span><span><i class="dot" style="background:var(--bad)"></i>Over indtægt</span><span><i style="width:14px;border-top:2px dashed var(--ok)"></i>Indtægt pr. md.</span></div>
+    <div class="grid2" style="margin-top:10px"><div class="stat"><span>Brugt i ${today.getFullYear()}</span><b>${kr(yearSpent)}</b></div><div class="stat"><span>Sparet i alt</span><b>${kr(S.goals.reduce((a,b)=>a+b.saved,0))}</b></div>
+    <div class="stat"><span>Gns. pr. måned</span><b>${kr(active.length?yearSpent/active.length:0)}</b></div><div class="stat"><span>Overskud i året</span><b style="color:${yearInc-yearSpent>=0?'var(--ok)':'var(--bad)'}">${kr(yearInc-yearSpent)}</b></div></div>`;
+  const yearCard=`<div class="card"><h2>Årsoverblik ${today.getFullYear()} ${S.premium?'':'<small class="lock">🔒 Premium</small>'}</h2>
+    ${S.premium?yearInner:`<div class="locked">${yearInner}</div>${lockBox('Årsoverblik')}`}</div>`;
+  const exportCard=`<div class="card"><h2>Eksport til Excel ${S.premium?'':'<small class="lock">🔒 Premium</small>'}</h2>
+    ${S.premium?`<div class="empty">Kopiér dine data og indsæt dem direkte i Excel eller Google Sheets.</div><button class="btn" onclick="exportSheet()">Eksportér ${monthName(d.getFullYear(),d.getMonth())}</button>`
+      :`<div class="empty">Få alle dine køb, faste udgifter og indtægter ud i et regneark.</div><button class="btn ghost" onclick="premiumSheet()">Lås op med Premium</button>`}</div>`;
+  return monthCard+yearCard+exportCard;
+}
+function exportSheet(){
+  const d=new Date(today.getFullYear(),today.getMonth()+repOffset,1);const m=ym(d);
+  const n=v=>String(v).replace('.',',');
+  const rows=[['Dato','Type','Kategori','Beskrivelse','Beløb (kr.)']];
+  S.incomes.forEach(i=>rows.push([m+'-01','Indtægt',i.kind,i.name,n(i.amount)]));
+  S.fixed.forEach(f=>rows.push([m+'-'+String(f.day).padStart(2,'0'),'Fast udgift','Faste udgifter',f.name,n(-f.amount)]));
+  txIn(m).sort((a,b)=>a.date.localeCompare(b.date)).forEach(t=>{const c=S.cats.find(c=>c.id===t.cat);rows.push([t.date,'Køb',c?c.name:'',t.note||'',n(-t.amount)])});
+  rows.push([],['','','','Tilbage',n(monthSummary(m).left)]);
+  const tsv=rows.map(r=>r.map(x=>String(x).replace(/[\t\n]/g,' ')).join('\t')).join('\n');
+  openSheet(`<h3>Eksport – ${monthName(d.getFullYear(),d.getMonth())}</h3>
+  <p style="color:var(--muted);font-size:14px;margin-top:0">Tryk “Kopiér”, åbn Excel, og indsæt i celle A1. Kolonnerne lander automatisk de rigtige steder.</p>
+  <textarea id="tsv" readonly>${esc(tsv)}</textarea>
+  <div style="display:flex;gap:8px;margin-top:10px"><button class="btn" onclick="copyTsv()">Kopiér</button><button class="btn ghost" onclick="closeSheet()">Luk</button></div>`);
+}
+async function copyTsv(){const ta=$('#tsv');try{await navigator.clipboard.writeText(ta.value);toast('Kopieret ✔ – indsæt i Excel')}catch(e){ta.select();toast('Markeret – tryk Ctrl/⌘+C')}}
+
+// ---------- Premium ----------
+function premiumSheet(){
+  openSheet(`<h3>${S.premium?'★ Du har Premium':'KRONEN Premium'}</h3>
+  <div style="font-size:32px;font-weight:900">29 kr.<span style="font-size:14px;color:var(--muted);font-weight:600">/md.</span></div>
+  <div style="margin:12px 0">
+  ${[['⭐','Ubegrænsede sparemål','Spar op til flere ting på én gang'],['📊','Årsoverblik','Se hele året i ét diagram'],['🔔','Påmindelser om faste udgifter','Vid, hvornår Spotify og telefon trækkes'],['📄','Eksport til Excel','Få dine tal ud i et regneark'],['🗂️','Ubegrænsede kategorier','Gratis har 3']].map(f=>`<div class="feat"><div style="font-size:20px">${f[0]}</div><div><b>${f[1]}</b><div style="color:var(--muted);font-size:13px">${f[2]}</div></div></div>`).join('')}
+  </div>
+  <div style="background:var(--bg);border-radius:12px;padding:10px 12px;font-size:13px;color:var(--muted);margin-bottom:12px"><b style="color:var(--ink)">Gratis:</b> 1 budget, 3 kategorier, 1 sparemål, månedsrapport og advarsler.</div>
+  <button class="btn" style="width:100%" onclick="togglePremium()">${S.premium?'Skift tilbage til Gratis (demo)':'Prøv Premium (demo)'}</button>
+  <p style="font-size:11px;color:var(--muted);text-align:center">Dette er en prototype – ingen betaling.</p>`);
+}
+function togglePremium(){S.premium=!S.premium;save();closeSheet();render();toast(S.premium?'★ Premium er slået til':'Du bruger nu Gratis')}
+$('#premBtn').onclick=premiumSheet;
+
+// ---------- Gem på hjemmeskærm ----------
+const standalone=matchMedia('(display-mode: standalone)').matches||navigator.standalone;
+const inFrame=window.self!==window.top;
+if(inFrame) document.querySelector('.app').style.paddingTop='52px';
+let deferredPrompt=null;
+function installBanner(html){if(standalone||inFrame)return;let dismissed=false;try{dismissed=localStorage.getItem('kronen-install-x')}catch(e){}if(dismissed)return;
+  $('#install').innerHTML=`<div class="alert info" style="align-items:center">📲 <div style="flex:1">${html}</div><button class="x" onclick="try{localStorage.setItem('kronen-install-x',1)}catch(e){};this.parentNode.remove()">×</button></div>`}
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredPrompt=e;
+  installBanner('Gem KRONEN på din hjemmeskærm <button class="btn small" style="margin-left:6px" onclick="doInstall()">Installér</button>')});
+async function doInstall(){if(!deferredPrompt)return;deferredPrompt.prompt();await deferredPrompt.userChoice;deferredPrompt=null;$('#install').innerHTML=''}
+if(/iphone|ipad|ipod/i.test(navigator.userAgent)) installBanner('Gem på hjemmeskærmen: tryk på <b>Del</b> <svg width="15" height="18" viewBox="0 0 15 18" style="vertical-align:-3px" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 1v11M3.5 5l4-4 4 4M4.5 8H2v9h11V8h-2.5"/></svg> nederst i Safari og vælg <b>“Føj til hjemmeskærm”</b>.');
+if('serviceWorker' in navigator&&location.protocol==='https:') navigator.serviceWorker.register('sw.js').catch(()=>{});
+
+render();
+</script>
+</body>
+</html>
