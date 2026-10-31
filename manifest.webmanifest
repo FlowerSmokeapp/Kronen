@@ -1,6 +1,6 @@
 {
-  "name": "KRONEN – budget for unge",
-  "short_name": "KRONEN",
+  "name": "Budgie – budget for unge",
+  "short_name": "Budgie",
   "description": "Hold styr på dine penge, sæt sparemål og få besked, før du bruger for meget.",
   "lang": "da",
   "start_url": "./app.html",

@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>KRONEN – budget for unge</title>
+<title>Budgie – budget for unge</title>
 <meta name="theme-color" content="#f7f7f9">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="KRONEN">
+<meta name="apple-mobile-web-app-title" content="Budgie">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
@@ -275,8 +275,8 @@ function renderAuth(){
   const signup=authMode==='signup';
   $('#root').innerHTML=`<div class="auth">
     <img class="mark" src="icons/icon-192.png" alt="">
-    <h1>${signup?'Opret din konto':hasFirebase?'Velkommen tilbage':'Velkommen til KRONEN'}</h1>
-    <p class="sub">${!hasFirebase?'Hold styr på dine penge – nemt og overskueligt.':signup?'Få styr på dine penge på 2 minutter. Dine data gemmes sikkert, så du kan bruge KRONEN på alle dine enheder.':'Log ind for at se dit budget.'}</p>
+    <h1>${signup?'Opret din konto':hasFirebase?'Velkommen tilbage':'Velkommen til Budgie'}</h1>
+    <p class="sub">${!hasFirebase?'Hold styr på dine penge – nemt og overskueligt.':signup?'Få styr på dine penge på 2 minutter. Dine data gemmes sikkert, så du kan bruge Budgie på alle dine enheder.':'Log ind for at se dit budget.'}</p>
     ${hasFirebase?`
     <form id="authForm">
       ${signup?`<label>Fornavn<input name="name" autocomplete="given-name" required placeholder="Fx Emma"></label>`:''}
@@ -582,7 +582,7 @@ async function copyTsv(){const ta=$('#tsv');try{await navigator.clipboard.writeT
 function profileSheet(){
   openSheet(`<div style="display:flex;align-items:center;gap:14px;margin-bottom:18px"><div class="avatar" style="width:52px;height:52px;font-size:20px;cursor:default">${esc(initials())}</div>
     <div><div style="font-weight:700;font-size:17px">${esc(S.name||'Din profil')}</div><div style="color:var(--muted);font-size:13.5px">${user?esc(user.email||''):'Demo – gemmes kun på denne enhed'}</div></div></div>
-  <div class="row" style="border:1px solid var(--line);border-radius:16px;padding:12px 14px;margin-bottom:14px"><div class="g"><div class="t">${S.premium?'KRONEN Premium':'Gratis'}</div><div class="s">${S.premium?'Alle funktioner er låst op':'1 budget · 3 kategorier · 1 sparemål'}</div></div>
+  <div class="row" style="border:1px solid var(--line);border-radius:16px;padding:12px 14px;margin-bottom:14px"><div class="g"><div class="t">${S.premium?'Budgie Premium':'Gratis'}</div><div class="s">${S.premium?'Alle funktioner er låst op':'1 budget · 3 kategorier · 1 sparemål'}</div></div>
     <button class="btn sm" onclick="premiumSheet()">${S.premium?'Se':'Opgrader'}</button></div>
   <form onsubmit="event.preventDefault();S.name=new FormData(this).get('n').trim();save();closeSheet();render()"><label>Dit navn<input name="n" value="${esc(S.name)}"></label><button class="btn sec2">Gem navn</button></form>
   <div style="display:flex;flex-direction:column;gap:10px;margin-top:10px">
@@ -597,7 +597,7 @@ function confirmReset(kind){
   return false;
 }
 function premiumSheet(){
-  openSheet(`<h3>KRONEN Premium</h3>
+  openSheet(`<h3>Budgie Premium</h3>
   <div style="font-size:34px;font-weight:800;letter-spacing:-.03em;margin-top:-8px">29 kr.<span style="font-size:15px;color:var(--muted);font-weight:500"> / måned</span></div>
   <div style="margin:14px 0 18px">
   ${[['star','Ubegrænsede sparemål','Spar op til flere ting på én gang'],['chart','Årsoverblik','Se hele året i ét diagram'],['bell','Påmindelser','Se hvad der trækkes de næste 7 dage'],['file','Eksport til Excel','Få dine tal ud i et regneark'],['wallet','Ubegrænsede kategorier','Gratis har 3']].map(f=>`<div class="feat"><div class="ico">${ic(f[0])}</div><div><b>${f[1]}</b><small>${f[2]}</small></div></div>`).join('')}
@@ -613,7 +613,7 @@ function showInstall(){
   const el=$('#install'); if(!el||standalone||framed) return;
   let x=false;try{x=localStorage.getItem('kronen-install-x')}catch(e){} if(x) return;
   let html='';
-  if(deferredPrompt) html=`Gem KRONEN på din hjemmeskærm <button class="btn sm" style="margin-left:auto" onclick="doInstall()">Installér</button>`;
+  if(deferredPrompt) html=`Gem Budgie på din hjemmeskærm <button class="btn sm" style="margin-left:auto" onclick="doInstall()">Installér</button>`;
   else if(/iphone|ipad|ipod/i.test(navigator.userAgent)) html=`<div>Gem på hjemmeskærmen: tryk ${ic('share','style="width:16px;height:16px;vertical-align:-3px"')} og vælg <b>Føj til hjemmeskærm</b>.</div>`;
   if(!html) return;
   el.innerHTML=`<div class="note info" style="gap:8px">${html}<button class="icon-btn" style="color:inherit" onclick="try{localStorage.setItem('kronen-install-x',1)}catch(e){};this.parentNode.remove()">${ic('x')}</button></div>`;

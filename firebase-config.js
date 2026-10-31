@@ -1,4 +1,4 @@
-// Firebase-opsætning for KRONEN.
+// Firebase-opsætning for Budgie.
 // Indsæt værdierne fra Firebase-konsollen (Projektindstillinger → Dine apps → Web-app).
 // Så længe apiKey er tom, kører appen i demo-tilstand uden login.
 window.FIREBASE_CONFIG = {
