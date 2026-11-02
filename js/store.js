@@ -26,11 +26,29 @@
     } catch (e) { /* fx privat browsing */ }
     return memory;
   }
+  // ---------- Gem på kontoen (sky) ----------
+  // remote = funktion, der gemmer på kontoen. Kaldes lidt forsinket, så mange små ændringer bliver ét kald.
+  let remote = null, timer = null, pending = null, onStatus = () => { };
+  function setRemote(fn, statusCb) { remote = fn; onStatus = statusCb || (() => { }); }
+  async function flush() {
+    clearTimeout(timer); timer = null;
+    if (!remote || !pending) return;
+    const s = pending; pending = null;
+    onStatus('saving');
+    try { await remote(s); onStatus(navigator.onLine === false ? 'offline' : 'saved'); }
+    catch (e) { pending = pending || s; onStatus('error'); }
+  }
   function save(s) {
     s.savedAt = new Date().toISOString();
     memory = s;
-    try { localStorage.setItem(KEY, JSON.stringify(s)); return true; } catch (e) { return false; }
+    let ok = true;
+    try { localStorage.setItem(KEY, JSON.stringify(s)); } catch (e) { ok = false; } // lokal kopi = hurtig start og offline
+    if (remote) { pending = s; clearTimeout(timer); timer = setTimeout(flush, 700); }
+    return ok;
   }
+  // Gem med det samme, hvis appen lukkes / skjules
+  if (typeof document !== 'undefined') document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flush(); });
+  if (typeof window !== 'undefined') window.addEventListener('online', () => { if (pending) flush(); });
   function clear() { memory = null; try { localStorage.removeItem(KEY); } catch (e) {} }
   /** Skift til en kontos egne data. Første konto på enheden overtager evt. data fra før der var konti. */
   function useAccount(id, adoptLegacy) {
@@ -103,5 +121,5 @@
     return s;
   }
 
-  window.Store = { uid, blank, load, save, clear, useAccount, normalize, exportJSON, importJSON, demo };
+  window.Store = { uid, blank, load, save, flush, setRemote, clear, useAccount, normalize, exportJSON, importJSON, demo };
 })();

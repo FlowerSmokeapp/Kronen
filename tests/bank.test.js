@@ -22,6 +22,7 @@ test('Samme køb importeres ikke to gange', () => {
   assert.equal(s.tx.length, 2);
   assert.equal(s.tx[0].source, 'bank');
   assert.equal(s.tx[0].note, 'Netto');
+  assert.equal(s.tx[1].note, 'DSB');
 });
 
 test('Demo Bank giver de samme køb for samme dag', () => {

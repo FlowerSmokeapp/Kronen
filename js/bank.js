@@ -73,7 +73,8 @@
     }
     return added;
   }
-  const tidy = t => String(t).toLowerCase().replace(/(^|[\s&/.-])\S/g, m => m.toUpperCase()).replace(/\/bill$/i, '');
+  // "NETTO KBH" → "Netto Kbh", men korte forkortelser som DSB og H&M bevares
+  const tidy = t => String(t).replace(/\/bill$/i, '').split(/(\s+)/).map(w => /^[A-ZÆØÅ&]{2,3}$/.test(w) ? w : w.toLowerCase().replace(/(^|[&/.-])\S/g, m => m.toUpperCase())).join('');
 
   async function sync(s, today, uid) {
     if (!s.bank) return 0;

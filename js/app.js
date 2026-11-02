@@ -33,10 +33,17 @@
   if (framed) document.documentElement.classList.add('framed');
   const icoBox = (name, color) => `<div class="ico" style="background:${tint(color)};color:${color}">${icon(name)}</div>`;
 
+  let ACC = null, syncState = 'saved';
   function save() { St.save(S); const el = $('#savedAt'); if (el) el.innerHTML = savedAtText(); }
+  function setSync(st) { syncState = st; const el = $('#savedAt'); if (el) el.innerHTML = savedAtText(); }
   function savedAtText() {
-    const t = S.savedAt ? new Date(S.savedAt) : null;
-    return `${icon('shield')} Saved on this device${t ? ' · ' + t.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : ''}`;
+    const t = S.savedAt ? new Date(S.savedAt) : null, time = t ? ' · ' + t.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '';
+    if (ACC && ACC.cloud) {
+      if (syncState === 'saving') return `${icon('sync')} Saving to your account…`;
+      if (syncState === 'error' || syncState === 'offline') return `${icon('alert')} Offline – saved on this phone, will sync when you're back online`;
+      return `${icon('shield')} Saved to your account${time}`;
+    }
+    return `${icon('shield')} ${ACC && ACC.demo ? 'Sample data – not saved' : 'Saved on this device'}${time}`;
   }
 
   // ---------- Måling (GoatCounter – kun anonyme hændelser) ----------
@@ -123,11 +130,16 @@
       <div class="foot">
         <button class="btn line" id="swap">${signup ? 'I already have an account' : 'Create a new account'}</button>
         <button class="btn sm soft" id="demo" style="align-self:center;background:none">Look around with sample data first</button>
-        <p class="small muted" style="text-align:center;margin:0">${icon('shield', 'tiny')} ${Auth.LOCAL_ONLY ? 'Your account is stored securely on this device.' : 'Your account is stored securely.'}</p>
+        ${!signup && Auth.CLOUD ? `<button class="btn sm soft" id="forgot" style="align-self:center;background:none">Forgot password?</button>` : ''}
+        <p class="small muted" style="text-align:center;margin:0">${icon('shield', 'tiny')} ${Auth.CLOUD ? 'Your numbers are saved to your account, so you can log in on any device.' : 'Your account is stored securely on this device.'}</p>
       </div></div>`;
     $('#swap').onclick = () => showAuth(signup ? 'login' : 'signup');
     $('#pwEye').onclick = () => { const i = $('#authForm [name=pw]'); i.type = i.type === 'password' ? 'text' : 'password'; };
     $('#demo').onclick = () => { Auth.startDemo(); enterApp(Auth.current(), false); };
+    if ($('#forgot')) $('#forgot').onclick = async () => {
+      try { await Auth.resetPassword($('#authForm [name=email]').value); $('#authErr').style.color = 'var(--ok)'; $('#authErr').textContent = 'We’ve sent you an email with a link to choose a new password.'; }
+      catch (e) { $('#authErr').style.color = 'var(--bad)'; $('#authErr').textContent = e.message; }
+    };
     $('#authForm').onsubmit = async e => {
       e.preventDefault();
       const f = new FormData(e.target), btn = $('#authBtn'); btn.disabled = true; $('#authErr').textContent = '';
@@ -141,16 +153,41 @@
   }
 
   /** Åbn en kontos data. Efter oprettelse/login vises Premium-tilbuddet først. */
-  function enterApp(acc, showOffer, isNew) {
-    St.useAccount(acc.id, isNew && !acc.demo);
-    S = St.load();
+  async function enterApp(acc, showOffer, isNew) {
+    ACC = acc;
+    St.useAccount(acc.id, isNew && !acc.demo && !acc.cloud);
+    St.setRemote(acc.cloud ? st => Auth.saveData(acc, st) : null, setSync);
+    let cached = St.load();
+    if (acc.cloud) {
+      $('#root').innerHTML = '<div class="loader"><div class="spin dark"></div><p class="muted small">Loading your budget…</p></div>';
+      let remote;
+      try { remote = await Auth.loadData(acc); }
+      catch (e) {
+        if (!cached) { showLoadError(acc, showOffer); return; }
+        remote = null; setSync('offline');
+      }
+      if (remote) S = St.normalize(remote);
+      else if (remote === undefined && isNew) {
+        // Ny konto i skyen: tag evt. data med, der lå på denne enhed fra før
+        let legacy = null; try { legacy = JSON.parse(localStorage.getItem('budgie:v2')); } catch (e) { }
+        S = legacy ? St.normalize(legacy) : null;
+      } else S = cached;
+    } else S = cached;
     if (!S) {
       if (acc.demo) S = St.demo(today);
       else { S = St.blank(today); S.name = acc.name; }
-      save();
     }
     if (!acc.demo && acc.name && !S.name) S.name = acc.name;
+    S.demo = !!acc.demo;
+    save();
     if (showOffer && !S.premium && !acc.demo) premiumOffer(); else startApp();
+  }
+  function showLoadError(acc, showOffer) {
+    $('#root').innerHTML = `<div class="flow" style="justify-content:center;text-align:center"><div class="ico big">${icon('alert')}</div>
+      <h1>Couldn't load your budget</h1><p class="lead">Check your internet connection and try again.</p>
+      <div class="foot"><button class="btn" id="retry">Try again</button><button class="btn sm soft" id="out" style="background:none;align-self:center">Log out</button></div></div>`;
+    $('#retry').onclick = () => enterApp(acc, showOffer);
+    $('#out').onclick = () => logout();
   }
 
   // ---------- Premium-tilbud (første skærm efter login) ----------
@@ -335,6 +372,7 @@
   // =====================================================================
   //  App-skal og navigation
   // =====================================================================
+  let bootError = false;
   const VIEWS = ['home', 'budget', 'goals', 'report'];
   let view = 'home';
   function startApp() {
@@ -451,9 +489,9 @@
         <div class="ring"><svg viewBox="0 0 230 230" aria-hidden="true"><circle cx="115" cy="115" r="${R}" fill="none" stroke="var(--soft)" stroke-width="16"/>
           <circle class="arc" cx="115" cy="115" r="${R}" fill="none" stroke="${col}" stroke-width="16" stroke-linecap="round" stroke-dasharray="${Cc}" stroke-dashoffset="${from}" data-to="${to}"/></svg>
           <div class="c"><div class="l">Left in ${mon}</div>
-            <div class="a" style="${m.left < 0 ? 'color:var(--bad)' : ''}">${kr(m.left)}</div>
+            <div class="a" style="${m.left < 0 ? 'color:var(--bad)' : ''}">${kr(Math.round(m.left))}</div>
             <div class="d">${sub}</div></div></div>
-        <div class="trio"><div><small>Income</small><b>${kr(m.income)}</b></div><div><small>Spent</small><b>${kr(m.fixed + m.spent)}</b></div><div><small>Saved</small><b>${kr(total)}</b></div></div>
+        <div class="trio"><div><small>Income</small><b>${kr(Math.round(m.income))}</b></div><div><small>Spent</small><b>${kr(Math.round(m.fixed + m.spent))}</b></div><div><small>Saved</small><b>${kr(Math.round(total))}</b></div></div>
       </section>`;
     const tile = (ic, title, sub, act, color) => `<button class="tile" data-act="${act}"><span class="ico" style="background:${tint(color)};color:${color}">${icon(ic)}</span><b>${title}</b><small>${sub}</small></button>`;
     const goalPct = goal ? Math.round(clamp(Cx.goalSaved(S, goal.id) / goal.target, 0, 1) * 100) : 0;
@@ -520,7 +558,7 @@
   function txRow(t) {
     const c = catById(t.cat);
     return `<button class="row" data-act="openTx|${t.id}" id="tx-${t.id}">${icoBox(c.icon, c.color)}
-      <div class="g"><div class="t">${esc(t.note || c.name)}</div><div class="s">${t.note ? esc(c.name) + ' · ' : ''}${dateLabel(t.date)}${t.source === 'bank' ? ' · ' + icon('bank', 'tiny') + ' Bank' : ''}</div></div>
+      <div class="g"><div class="t">${esc(t.note || c.name)}</div><div class="s">${t.note ? esc(c.name) + ' · ' : ''}${dateLabel(t.date)}${t.source === 'bank' || t.source === 'csv' ? ' · ' + icon('bank', 'tiny') + ' Bank' : ''}</div></div>
       <div class="v">−${kr(t.amount)}</div></button>`;
   }
 
@@ -884,7 +922,7 @@
   // =====================================================================
   function settingsSheet() {
     const lb = S.settings.lastBackupAt;
-    const acc = Auth.current() || { name: S.name, email: '' };
+    const acc = ACC || { name: S.name, email: '' };
     openSheet('Settings', `
       <div class="row" style="padding-top:0"><div class="avatar">${esc((S.name || acc.name || '?').charAt(0).toUpperCase())}</div>
         <div class="g"><div class="t">${esc(S.name || acc.name)}</div><div class="s">${acc.demo ? 'Sample data – nothing is saved' : esc(acc.email)}</div></div>
@@ -893,7 +931,7 @@
       <button class="btn line" id="goBank" style="margin-top:12px">${icon('bank')} ${S.bank ? 'Bank: ' + esc(S.bank.name) : 'Connect your bank'}</button>
       <button class="btn line" id="goSetup" style="margin-top:10px">${icon('wallet')} Set up budget again</button>
       <div class="card" style="margin:14px 0 10px"><div class="sec"><h2>Backup</h2><span class="meta">${icon('shield')}</span></div>
-        <p class="small muted" style="margin:0 0 12px">Your numbers are saved on this device. ${lb ? `Last backup: ${fmtDate(lb, { day: 'numeric', month: 'long' })}.` : 'You haven’t made a backup yet.'}</p>
+        <p class="small muted" style="margin:0 0 12px">${acc.cloud ? 'Your numbers are saved to your account. You can also keep your own copy.' : 'Your numbers are saved on this device.'} ${lb ? `Last backup: ${fmtDate(lb, { day: 'numeric', month: 'long' })}.` : 'You haven’t made a backup yet.'}</p>
         <div class="btns"><button class="btn soft" id="bkSave">${icon('download')} Save backup</button><button class="btn soft" id="bkLoad">${icon('upload')} Restore</button></div></div>
       <label class="toggle"><span><b style="display:block">Savings tip on payday</b><span class="small muted">Suggests putting ${CFG.saveSuggestionPct}% aside</span></span><input type="checkbox" id="tipToggle" ${S.settings.saveSuggest ? 'checked' : ''}></label>
       <div style="display:flex;flex-direction:column;gap:10px;margin-top:10px">
@@ -913,7 +951,10 @@
     $('#logout').onclick = () => { closeSheet(); logout(); };
     $('#goBank').onclick = () => { closeSheet(); bankSheet(); };
     $('#goSetup').onclick = () => { closeSheet(); startOnboarding(); };
-    if ($('#reset')) $('#reset').onclick = () => { closeSheet(); confirmSheet('Delete your account?', 'Your account and all your income, purchases and goals will be deleted from this device. Save a backup first if you want to keep them.', 'Delete account', () => { St.clear(); Auth.deleteAccount(acc.email); S = null; lastRing = null; showAuth('signup'); toast('Account deleted'); }); };
+    if ($('#reset')) $('#reset').onclick = () => { closeSheet(); confirmSheet('Delete your account?', `Your account and all your income, purchases and goals will be deleted${acc.cloud ? '' : ' from this device'}. Save a backup first if you want to keep them.`, 'Delete account', async () => {
+      try { St.setRemote(null); await Auth.deleteAccount(acc); St.clear(); S = null; ACC = null; lastRing = null; showAuth('signup'); toast('Account deleted'); }
+      catch (e) { toast(esc(e.message)); St.setRemote(acc.cloud ? st => Auth.saveData(acc, st) : null, setSync); }
+    }); };
   }
   async function backupNow() {
     const ok = await shareOrDownload(new Blob([St.exportJSON(S)], { type: 'application/json' }), `budgie-backup-${today}.json`, 'Budgie backup');
@@ -935,7 +976,8 @@
     inp.click();
   }
   function privacySheet() {
-    openSheet('Privacy', `<div>${CFG.texts.privacy.map(p => `<div class="feat"><div class="ico">${icon('shield')}</div><div><small style="font-size:.9375rem;color:var(--ink)">${esc(p)}</small></div></div>`).join('')}</div>
+    const lines = [ACC && ACC.cloud ? CFG.texts.storageCloud : CFG.texts.storageLocal, ...CFG.texts.privacy];
+    openSheet('Privacy', `<div>${lines.map(p => `<div class="feat"><div class="ico">${icon('shield')}</div><div><small style="font-size:.9375rem;color:var(--ink)">${esc(p)}</small></div></div>`).join('')}</div>
       <p class="small muted" style="margin:12px 0 16px">${esc(CFG.texts.disclaimer)}</p><button class="btn soft" data-close>Close</button>`);
     $('#sheet button.btn[data-close]').onclick = closeSheet;
   }
@@ -1003,8 +1045,10 @@
     pdf: () => { track('export-pdf'); window.print(); },
   };
   function startOwn() { St.clear(); logout('signup'); }
-  function logout(mode = 'login') {
-    Auth.logOut(); S = null; lastRing = null; OB = null;
+  async function logout(mode = 'login') {
+    await St.flush(); St.setRemote(null);
+    if (ACC && ACC.cloud) St.clear(); // ingen kopi tilbage på en delt enhed
+    await Auth.logOut(); S = null; ACC = null; lastRing = null; OB = null;
     showAuth(Auth.hasAccounts() ? mode : 'signup');
   }
 
@@ -1019,13 +1063,17 @@
           <span class="small">${plural(n, 'purchase', 'purchases')} imported${b.lastSyncAt ? ' · last synced ' + dateLabel(b.lastSync).toLowerCase() + ' ' + new Date(b.lastSyncAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : ''}</span></div></div>
         <p class="small muted" style="margin:0 0 14px">Read-only access until ${fmtDate(b.consentUntil, { day: 'numeric', month: 'long', year: 'numeric' })}. Budgie can see purchases, but can never move money. Imported purchases are sorted into your categories automatically – tap one to change it.</p>
         <button class="btn" id="bkSync">${icon('sync')} Sync now</button>
+        <button class="btn soft" id="bkCsv" style="margin-top:10px">${icon('upload')} Import a file from your netbank</button>
         <button class="btn danger" id="bkOff" style="margin-top:10px">Disconnect</button>`);
       $('#bkSync').onclick = () => syncBank(true);
+      $('#bkCsv').onclick = csvSheet;
       $('#bkOff').onclick = () => { closeSheet(); confirmSheet('Disconnect bank?', 'Budgie stops fetching new purchases. Do you also want to remove the purchases that were imported?', 'Disconnect & remove', () => { withUndo('Bank disconnected', () => Bank.disconnect(S, true)); }); };
       return;
     }
-    openSheet('Connect your bank', `
-      <p class="muted" style="margin:0 0 6px">Import your purchases automatically instead of typing them in.</p>
+    openSheet('Get purchases from your bank', `
+      <button class="row" id="bkCsv" style="border:1px solid var(--line);border-radius:16px;padding:10px 12px">${icoBox('upload', '#059669')}<div class="g"><div class="t">Import a file from your netbank</div><div class="s">Works with all banks today · CSV file</div></div><span class="muted">${icon('right')}</span></button>
+      <div class="sec" style="margin-top:18px"><h2>Connect automatically</h2></div>
+      <p class="muted small" style="margin:0 0 6px">New purchases come in by themselves every day.</p>
       ${[['eye', 'Read-only', 'Budgie can see purchases – never move money.'], ['shield', 'You approve it in your bank', 'You log in with MitID at your bank, never in Budgie.'], ['x', 'Disconnect any time', 'Your approval runs out by itself after 180 days.']]
         .map(f => `<div class="feat"><div class="ico">${icon(f[0])}</div><div><b>${f[1]}</b><small>${f[2]}</small></div></div>`).join('')}
       <div class="sec" style="margin-top:12px"><h2>Choose your bank</h2></div>
@@ -1033,6 +1081,7 @@
       ${Bank.COMING.map(n => `<div class="row" style="opacity:.55">${icoBox('bank', '#64748b')}<div class="g"><div class="t">${esc(n)}</div><div class="s">Coming later</div></div></div>`).join('')}
       <p class="small muted" style="margin:12px 0 0">Real banks need a licensed open banking partner. Until then you can try the whole flow with Demo Bank.</p>`);
     $('#pickDemo').onclick = () => bankConsent('demo');
+    $('#bkCsv').onclick = csvSheet;
   }
   function bankConsent(id) {
     const p = Bank.PROVIDERS[id];
@@ -1054,6 +1103,39 @@
         <p class="small muted" style="margin:0 0 16px">Something in the wrong place? Tap the purchase to change its category.</p>
         <button class="btn" id="seeTx">See purchases</button>`);
       $('#seeTx').onclick = () => { closeSheet(); go('budget', { tab: 'purchases' }); };
+    };
+  }
+  // ---------- Import af fil fra netbanken (CSV) ----------
+  function csvSheet() {
+    openSheet('Import from your netbank', `
+      ${[['bank', 'Log in to your netbank', 'On a computer or in the browser on your phone'], ['file', 'Find “Transactions” and export', 'Choose CSV (or “Excel/CSV”) and a period, e.g. the last 3 months'], ['upload', 'Choose the file here', 'Budgie finds the purchases and sorts them into categories']]
+        .map((f, i) => `<div class="feat"><div class="ico">${icon(f[0])}</div><div><b>${i + 1}. ${f[1]}</b><small>${f[2]}</small></div></div>`).join('')}
+      <p class="small muted" style="margin:8px 0 14px">Only purchases (money out) are imported. The file is read on your phone – it isn't uploaded anywhere. Importing the same file twice won't create duplicates.</p>
+      <button class="btn" id="csvPick">${icon('upload')} Choose file</button>`);
+    $('#csvPick').onclick = () => {
+      const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.csv,.txt,text/csv,text/plain';
+      inp.onchange = async () => {
+        const f = inp.files[0]; if (!f) return;
+        let text = await f.text();
+        if (text.includes('\ufffd')) { try { text = new TextDecoder('windows-1252').decode(await f.arrayBuffer()); } catch (e) { } } // ældre bankfiler
+        let r;
+        try { r = CsvImport.read(text); } catch (e) { toast(esc(e.message)); return; }
+        const known = new Set(S.tx.filter(t => t.ext).map(t => t.ext));
+        const fresh = r.purchases.filter(p => !known.has(p.ext));
+        const dates = r.purchases.map(p => p.date).sort();
+        openSheet('Check the import', `
+          <p style="margin:0 0 4px">Found <b>${plural(r.purchases.length, 'purchase', 'purchases')}</b>${dates.length ? ` from ${fmtDate(dates[0], { day: 'numeric', month: 'short' })} to ${fmtDate(dates[dates.length - 1], { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}.</p>
+          <p class="small muted" style="margin:0 0 12px">${fresh.length < r.purchases.length ? `${r.purchases.length - fresh.length} already imported. ` : ''}${r.incomeCount ? `${plural(r.incomeCount, 'payment in', 'payments in')} skipped.` : ''}</p>
+          <div class="card" style="padding:4px 14px">${fresh.slice(0, 5).map(p => { const c = catById(Bank.categorize(p.text, S.cats)); return `<div class="row">${icoBox(c.icon, c.color)}<div class="g"><div class="t">${esc(p.text)}</div><div class="s">${esc(c.name)} · ${dateLabel(p.date)}</div></div><div class="v">−${kr(p.amount)}</div></div>`; }).join('') || '<p class="empty">Nothing new in this file.</p>'}
+          ${fresh.length > 5 ? `<p class="small muted" style="margin:4px 0 10px">…and ${fresh.length - 5} more</p>` : ''}</div>
+          <button class="btn" id="csvGo" ${fresh.length ? '' : 'disabled'}>Import ${plural(fresh.length, 'purchase', 'purchases')}</button>`);
+        $('#csvGo').onclick = () => {
+          let n = 0;
+          withUndo(`Imported ${plural(fresh.length, 'purchase', 'purchases')}`, () => { n = Bank.merge(S, fresh, uid); S.tx.forEach(t => { if (fresh.some(p => p.ext === t.ext)) t.source = 'csv'; }); });
+          track('csv-import'); closeSheet(); go('budget', { tab: 'purchases' });
+        };
+      };
+      inp.click();
     };
   }
   async function syncBank(manual) {
@@ -1097,8 +1179,16 @@
   $('#modal').addEventListener('click', e => { if (e.target.id === 'modal') closeSheet(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#modal').classList.contains('open')) closeSheet(); });
   loadAnalytics();
-  const acc = Auth.current();
-  if (acc) enterApp(acc, false); else showAuth(Auth.hasAccounts() ? 'login' : 'signup');
+  $('#root').innerHTML = '<div class="loader"><div class="spin dark"></div></div>';
+  Auth.init().catch(e => { console.error(e); bootError = true; }).finally(() => {
+    if (bootError && Auth.CLOUD) {
+      $('#root').innerHTML = `<div class="flow" style="justify-content:center;text-align:center"><div class="ico big">${icon('alert')}</div><h1>No connection</h1>
+        <p class="lead">Budgie needs the internet the first time you log in.</p><div class="foot"><button class="btn" onclick="location.reload()">Try again</button></div></div>`;
+      return;
+    }
+    const acc = Auth.current();
+    if (acc) enterApp(acc, false); else showAuth(Auth.hasAccounts() ? 'login' : 'signup');
+  });
 
   // Til test i konsollen
   window.Budgie = { get state() { return S; }, setToday(iso) { today = iso; curYM = iso.slice(0, 7); repYM = null; txFilter.ym = null; if (S) { render(); monthCheck(); } } };

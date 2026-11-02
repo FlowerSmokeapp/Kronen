@@ -63,12 +63,14 @@ window.BUDGIE_CONFIG = {
   texts: {
     welcomeTitle: "Hi! I'm Budgie",
     welcomeText: 'Get on top of your money in 2 minutes. See what you have left, save for your goals and get a heads-up before you overspend.',
+    storageLocal: 'Your account and numbers are stored on this device only.',
+    storageCloud: 'Your numbers are saved to your account (Google Firebase, EU), so you can log in on any device. Only you can read them.',
     privacy: [
-      'Your account and numbers are stored on this device. They are never sent to us or anyone else.',
       'Your password is never stored – only a scrambled version (hash) of it.',
       'A bank connection is read-only: Budgie can see purchases, but can never move money. You can disconnect at any time.',
       'If analytics is on, we only count anonymous events (like "first purchase"). Never amounts, names or emails.',
-      'Make a backup now and then – if you delete the app or clear your browser data, your numbers are gone.',
+      'We never sell or share your data.',
+      'You can download a backup or delete your account at any time in Settings.',
     ],
     disclaimer: 'Budgie gives guidance, not financial advice.',
   },

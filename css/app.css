@@ -289,3 +289,6 @@ svg.i.tiny { width: .9em; height: .9em; vertical-align: -.12em; }
 .offer h1 { margin-top: 10px; }
 .offer .lead { margin-bottom: 6px; }
 .offer-list .feat { padding: 9px 0; }
+
+.loader { min-height: 100vh; display: flex; flex-direction: column; gap: 14px; align-items: center; justify-content: center; }
+.spin.dark { width: 32px; height: 32px; border-color: var(--line); border-top-color: var(--brand); }
