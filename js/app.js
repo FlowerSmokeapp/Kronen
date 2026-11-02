@@ -104,35 +104,104 @@
   // =====================================================================
   //  Velkomst & onboarding
   // =====================================================================
-  function showWelcome() {
+  // ---------- Konto: opret / log ind ----------
+  function showAuth(mode = 'signup') {
     document.body.classList.remove('has-nav');
-    $('#root').innerHTML = `<div class="flow welcome">
+    const signup = mode === 'signup';
+    $('#root').innerHTML = `<div class="flow auth">
       <img class="logo" src="icons/icon-192.png" alt="">
-      <h1>${esc(CFG.texts.welcomeTitle)}</h1>
-      <p class="lead">${esc(CFG.texts.welcomeText)}</p>
-      <div class="points">
-        <div>${icon('plus')} Add a purchase in 3 taps</div>
-        <div>${icon('target')} Save up for what matters to you</div>
-        <div>${icon('shield')} Your numbers stay on your phone</div>
-      </div>
+      <h1>${signup ? 'Create your account' : 'Welcome back'}</h1>
+      <p class="lead">${signup ? esc(CFG.texts.welcomeText) : 'Log in to see your budget.'}</p>
+      <form id="authForm" novalidate>
+        ${signup ? `<label class="f">First name<input name="name" autocomplete="given-name" placeholder="e.g. Emma" required></label>` : ''}
+        <label class="f">Email<input name="email" type="email" autocomplete="email" inputmode="email" placeholder="you@email.com" required></label>
+        <label class="f">Password<span class="pw"><input name="pw" type="password" autocomplete="${signup ? 'new-password' : 'current-password'}" placeholder="${signup ? 'At least 6 characters' : ''}" required minlength="6">
+          <button type="button" class="icon-btn" id="pwEye" aria-label="Show password">${icon('eye')}</button></span></label>
+        <p class="small" id="authErr" role="alert" style="color:var(--bad);margin:0;min-height:1.2em"></p>
+        <button class="btn" id="authBtn">${signup ? 'Create account' : 'Log in'}</button>
+      </form>
       <div class="foot">
-        <button class="btn" id="go">Get started</button>
-        <button class="btn line" id="demo">Try it with sample data</button>
-        <button class="btn sm soft" id="restore" style="align-self:center;background:none">Restore a backup</button>
+        <button class="btn line" id="swap">${signup ? 'I already have an account' : 'Create a new account'}</button>
+        <button class="btn sm soft" id="demo" style="align-self:center;background:none">Look around with sample data first</button>
+        <p class="small muted" style="text-align:center;margin:0">${icon('shield', 'tiny')} ${Auth.LOCAL_ONLY ? 'Your account is stored securely on this device.' : 'Your account is stored securely.'}</p>
       </div></div>`;
-    $('#go').onclick = startOnboarding;
-    $('#demo').onclick = () => { S = St.demo(today); save(); startApp(); };
-    $('#restore').onclick = restorePick;
+    $('#swap').onclick = () => showAuth(signup ? 'login' : 'signup');
+    $('#pwEye').onclick = () => { const i = $('#authForm [name=pw]'); i.type = i.type === 'password' ? 'text' : 'password'; };
+    $('#demo').onclick = () => { Auth.startDemo(); enterApp(Auth.current(), false); };
+    $('#authForm').onsubmit = async e => {
+      e.preventDefault();
+      const f = new FormData(e.target), btn = $('#authBtn'); btn.disabled = true; $('#authErr').textContent = '';
+      try {
+        const acc = signup ? await Auth.signUp(f.get('name'), f.get('email'), f.get('pw')) : await Auth.logIn(f.get('email'), f.get('pw'));
+        if (signup) track('signup');
+        enterApp(acc, true, signup);
+      } catch (err) { $('#authErr').textContent = err.userFacing ? err.message : 'Something went wrong. Please try again.'; btn.disabled = false; }
+    };
+    setTimeout(() => { const i = $('#authForm input'); if (i) i.focus(); }, 60);
+  }
+
+  /** Åbn en kontos data. Efter oprettelse/login vises Premium-tilbuddet først. */
+  function enterApp(acc, showOffer, isNew) {
+    St.useAccount(acc.id, isNew && !acc.demo);
+    S = St.load();
+    if (!S) {
+      if (acc.demo) S = St.demo(today);
+      else { S = St.blank(today); S.name = acc.name; }
+      save();
+    }
+    if (!acc.demo && acc.name && !S.name) S.name = acc.name;
+    if (showOffer && !S.premium && !acc.demo) premiumOffer(); else startApp();
+  }
+
+  // ---------- Premium-tilbud (første skærm efter login) ----------
+  function premiumOffer() {
+    track('premium-offer-shown');
+    document.body.classList.remove('has-nav');
+    let plan = 'year';
+    const saving = Math.round((1 - CFG.prices.year / (CFG.prices.month * 12)) * 100);
+    const feats = [
+      ['wallet', 'Unlimited categories', `Free has ${CFG.free.categories}`],
+      ['target', 'Unlimited savings goals', `Free has ${CFG.free.goals}`],
+      ['chart', 'Year overview', 'See all 12 months in one chart'],
+      ['bell', 'Bill reminders a week ahead', `Free reminds you ${CFG.free.reminderDays} days before`],
+      ['file', 'Export to Excel & PDF', 'Take your numbers anywhere'],
+      ['sparkle', 'Widgets & themes', 'Coming soon'],
+    ];
+    $('#root').innerHTML = `<div class="flow offer">
+      <button class="icon-btn round close" id="offerX" aria-label="Close and continue with Free">${icon('x')}</button>
+      <span class="pro" style="align-self:flex-start">PREMIUM</span>
+      <h1>Get more out of Budgie</h1>
+      <p class="lead">Everything in Free, plus:</p>
+      <div class="offer-list">${feats.map(f => `<div class="feat"><div class="ico">${icon(f[0])}</div><div><b>${f[1]}</b><small>${f[2]}</small></div></div>`).join('')}</div>
+      <div class="seg" id="plans" style="margin-top:14px"><button data-plan="month">${CFG.prices.month} kr.<small>per month</small></button><button class="on" data-plan="year">${CFG.prices.year} kr.<small>per year · save ${saving}%</small></button></div>
+      <div class="foot" id="offerAct" style="padding-top:4px">
+        <button class="btn" id="offerTry">Try Premium free for 14 days</button>
+        <button class="btn sm soft" id="offerSkip" style="align-self:center;background:none">Continue with Free</button>
+        <p class="small muted" style="text-align:center;margin:0">Premium isn't open yet – nothing is charged. Tapping “Try” just tells us you're interested.</p>
+      </div></div>`;
+    document.querySelectorAll('#plans [data-plan]').forEach(b => b.onclick = () => { plan = b.dataset.plan; document.querySelectorAll('#plans button').forEach(x => x.classList.toggle('on', x === b)); });
+    const go = () => { track('premium-offer-closed'); startApp(); };
+    $('#offerX').onclick = go; $('#offerSkip').onclick = go;
+    $('#offerTry').onclick = () => {
+      track('premium-trial-' + plan); S.events['premium-interest'] = today; save();
+      $('#offerAct').innerHTML = `<div class="note ok">${icon('check')}<div class="body">Thanks! Premium isn't open yet – we'll use this to decide when to launch it.</div></div><button class="btn" id="offerGo">Continue to Budgie</button>`;
+      $('#offerGo').onclick = startApp;
+    };
   }
 
   let OB = null;
+  /** "Set up your budget": indtægt → faste udgifter → grænser → sparemål. Kan åbnes igen fra appen. */
   function startOnboarding() {
+    const shareOf = c => (CFG.categories.find(x => x.icon === c.icon || x.name === c.name) || {}).share || 10;
+    const fixedSug = CFG.fixedSuggestions.filter(f => !S.fixed.some(x => x.name.toLowerCase() === f.name.toLowerCase())).map(f => ({ ...f, amount: String(f.amount) }));
     OB = {
-      step: 1, name: '',
-      incomes: [{ kind: CFG.incomeTypes[0], amount: '', day: 1 }],
-      fixed: CFG.fixedSuggestions.map(f => ({ ...f, amount: String(f.amount) })),
-      cats: null, goal: { name: CFG.goalSuggestions[0], target: '', monthly: '' },
+      step: 2, first: 2,
+      incomes: S.incomes.length ? S.incomes.map(i => ({ id: i.id, kind: i.kind, amount: String(i.amount), day: i.day || 1 })) : [{ kind: CFG.incomeTypes[0], amount: '', day: 1 }],
+      fixed: [...S.fixed.map(f => ({ id: f.id, name: f.name, amount: String(f.amount), day: f.day, icon: f.icon, on: true })), ...fixedSug],
+      cats: S.budgetSet ? S.cats.map(c => ({ id: c.id, name: c.name, icon: c.icon, color: c.color, share: shareOf(c), limit: String(c.limit || '') })) : null,
+      goal: { name: CFG.goalSuggestions[0], target: '', monthly: '' },
     };
+    document.body.classList.remove('has-nav');
     obRender();
   }
   const obIncome = () => Cx.sum(OB.incomes, i => Cx.parseAmount(i.amount) || 0);
@@ -142,8 +211,8 @@
   const STEPS = 5;
 
   function obRender() {
-    const n = OB.step;
-    const progress = Array.from({ length: STEPS }, (_, i) => `<i class="${i < n ? 'on' : ''}"></i>`).join('');
+    const n = OB.step, total = STEPS - OB.first + 1, nr = n - OB.first + 1;
+    const progress = Array.from({ length: total }, (_, i) => `<i class="${i < nr ? 'on' : ''}"></i>`).join('');
     let body = '', foot = '';
     if (n === 1) {
       body = `<h1>What should we call you?</h1><p class="lead">Just your first name. It stays on your phone.</p>
@@ -173,8 +242,9 @@
       foot = `<button class="btn" data-next>Next</button>`;
     } else if (n === 4) {
       if (!OB.cats) {
-        const lim = Cx.suggestLimits(obAvail(), CFG.categories, CFG.savePctDefault);
-        OB.cats = CFG.categories.map((c, i) => ({ ...c, limit: String(lim[i]) }));
+        const base = S.cats.map(c => ({ id: c.id, name: c.name, icon: c.icon, color: c.color, share: (CFG.categories.find(x => x.icon === c.icon || x.name === c.name) || {}).share || 10 }));
+        const lim = Cx.suggestLimits(obAvail(), base, CFG.savePctDefault);
+        OB.cats = base.map((c, i) => ({ ...c, limit: String(lim[i]) }));
       }
       body = `<h1>Your monthly budget</h1><p class="lead">After fixed expenses you have <b>${kr(obAvail())}</b> a month to spend and save.</p>
         <div class="tip"><b>Rule of thumb:</b> put about ${CFG.savePctDefault}% aside, and split the rest between things you need and things that are fun. You can change it all later.</div>
@@ -184,7 +254,8 @@
       foot = `<button class="btn" data-next>Next</button>`;
     } else if (n === 5) {
       if (!OB.goal.monthly) OB.goal.monthly = String(Math.max(0, Math.floor((obAvail() - obLimits()) / 50) * 50) || '');
-      body = `<h1>What are you saving for?</h1><p class="lead">A goal makes it easier to stick to the plan.</p>
+      const hasGoal = S.goals.length > 0;
+      body = hasGoal ? `<h1>You're all set</h1><p class="lead">You already have a savings goal: <b>${esc(S.goals[0].name)}</b>. You can change it under Goals.</p>` : `<h1>What are you saving for?</h1><p class="lead">A goal makes it easier to stick to the plan.</p>
         <div class="chips" style="margin-bottom:14px">${CFG.goalSuggestions.map(g => `<button type="button" class="chip ${g === OB.goal.name ? 'on' : ''}" data-goal="${esc(g)}">${esc(g)}</button>`).join('')}</div>
         <form id="obGoal" onsubmit="return false">
           <label class="f">Goal<input id="gName" value="${esc(OB.goal.name)}" placeholder="e.g. New phone"></label>
@@ -193,9 +264,9 @@
             <label class="f">Save per month<span class="money"><input id="gMonthly" inputmode="decimal" value="${esc(amountInput(OB.goal.monthly))}" placeholder="0"></span></label>
           </div></form>
         <p class="muted" id="gEta" style="text-align:center;min-height:1.4em"></p>`;
-      foot = `<button class="btn" id="finish">Finish</button><button class="btn sm soft" style="background:none" id="skipGoal">Skip for now</button>`;
+      foot = hasGoal ? `<button class="btn" id="skipGoal">Finish</button>` : `<button class="btn" id="finish">Finish</button><button class="btn sm soft" style="background:none" id="skipGoal">Skip for now</button>`;
     }
-    $('#root').innerHTML = `<div class="flow"><div class="flow-top"><button class="icon-btn" id="back" aria-label="Back">${icon('left')}</button><div class="progress" aria-label="Step ${n} of ${STEPS}">${progress}</div><span class="small muted nowrap" style="min-width:44px;text-align:right">${n}/${STEPS}</span></div>
+    $('#root').innerHTML = `<div class="flow"><div class="flow-top"><button class="icon-btn" id="back" aria-label="Back">${icon('left')}</button><div class="progress" aria-label="Step ${nr} of ${total}">${progress}</div><span class="small muted nowrap" style="min-width:44px;text-align:right">${nr}/${total}</span></div>
       <div class="grow">${body}</div><div class="foot">${foot}</div></div>`;
     window.scrollTo(0, 0);
     obBind();
@@ -203,7 +274,7 @@
 
   function obBind() {
     const n = OB.step, root = $('#root');
-    $('#back').onclick = () => { if (OB.step === 1) { OB = null; showWelcome(); } else { OB.step--; obRender(); } };
+    $('#back').onclick = () => { if (OB.step === OB.first) { OB = null; startApp(); } else { OB.step--; obRender(); } };
     const next = root.querySelector('[data-next]');
     if (next) next.onclick = obNext;
     if (n === 1) { const i = $('#obName'); i.oninput = () => OB.name = i.value; i.onkeydown = e => { if (e.key === 'Enter') obNext(); }; setTimeout(() => i.focus(), 50); }
@@ -221,9 +292,10 @@
       root.querySelectorAll('[data-fx-amt]').forEach(el => el.oninput = () => { const f = OB.fixed[el.dataset.fxAmt]; f.amount = el.value; if (Cx.parseAmount(el.value) > 0 && !f.on) { f.on = true; root.querySelector(`[data-fx-on="${el.dataset.fxAmt}"]`).classList.add('on'); } upd(); });
       root.querySelectorAll('[data-fx-name]').forEach(el => el.oninput = () => OB.fixed[el.dataset.fxName].name = el.value);
       $('#addFx').onclick = () => { OB.fixed.push({ name: '', amount: '', day: 1, icon: 'repeat', on: true, custom: true }); obRender(); const ins = root.querySelectorAll('[data-fx-name]'); ins[ins.length - 1]?.focus(); };
-      OB.cats = null; // genberegn forslag, hvis tallene ændres
+      if (!S.budgetSet) OB.cats = null; // genberegn forslag, hvis tallene ændres
     }
     if (n === 4) root.querySelectorAll('[data-cat-lim]').forEach(el => el.oninput = () => { OB.cats[el.dataset.catLim].limit = el.value; $('#leftSave').textContent = kr(obAvail() - obLimits()); });
+    if (n === 5 && S.goals.length) { $('#skipGoal').onclick = () => obFinish(false); return; }
     if (n === 5) {
       const eta = () => {
         const t = Cx.parseAmount(OB.goal.target), m = Cx.parseAmount(OB.goal.monthly);
@@ -246,15 +318,18 @@
   }
   function obFinish(withGoal) {
     if (withGoal && !(Cx.parseAmount(OB.goal.target) > 0 && OB.goal.name.trim())) { toast('Add a name and a price – or tap "Skip for now"'); return; }
-    S = St.blank(today);
-    S.name = OB.name.trim();
-    S.incomes = OB.incomes.filter(i => Cx.parseAmount(i.amount) > 0).map(i => ({ id: uid(), kind: i.kind, name: i.kind, amount: Cx.parseAmount(i.amount), day: +i.day || 1 }));
-    S.fixed = OB.fixed.filter(f => f.on && Cx.parseAmount(f.amount) > 0).map(f => ({ id: uid(), name: (f.name || 'Fixed expense').trim(), amount: Cx.parseAmount(f.amount), day: f.day || 1, icon: f.icon || 'repeat' }));
-    const cats = OB.cats || CFG.categories.map(c => ({ ...c, limit: '0' }));
-    S.cats = cats.map(c => ({ id: uid(), name: c.name, icon: c.icon, color: c.color, limit: Cx.parseAmount(c.limit) || 0 }));
-    if (withGoal) S.goals = [{ id: uid(), name: OB.goal.name.trim(), target: Cx.parseAmount(OB.goal.target), monthly: Cx.parseAmount(OB.goal.monthly) || 0, icon: 'star' }];
+    const prev = S.incomes;
+    S.incomes = OB.incomes.filter(i => Cx.parseAmount(i.amount) > 0).map(i => {
+      const old = prev.find(x => x.id === i.id);
+      return { id: i.id || uid(), kind: i.kind, name: old && old.name !== old.kind ? old.name : i.kind, amount: Cx.parseAmount(i.amount), day: +i.day || 1 };
+    });
+    S.fixed = OB.fixed.filter(f => f.on && Cx.parseAmount(f.amount) > 0).map(f => ({ id: f.id || uid(), name: (f.name || 'Fixed expense').trim(), amount: Cx.parseAmount(f.amount), day: f.day || 1, icon: f.icon || 'repeat' }));
+    if (OB.cats) for (const c of OB.cats) { const t = S.cats.find(x => x.id === c.id); if (t) t.limit = Cx.parseAmount(c.limit) || 0; }
+    if (withGoal) S.goals.push({ id: uid(), name: OB.goal.name.trim(), target: Cx.parseAmount(OB.goal.target), monthly: Cx.parseAmount(OB.goal.monthly) || 0, icon: 'star' });
+    const first = !S.budgetSet;
+    S.budgetSet = true;
     OB = null; save(); trackOnce('onboarding-done');
-    startApp(); confetti(); toast('Your budget is ready!');
+    startApp(); if (first) confetti(); toast(first ? 'Your budget is ready!' : 'Budget updated');
   }
 
   // =====================================================================
@@ -271,7 +346,7 @@
         <button data-v="budget">${icon('wallet')}<span>Budget</span></button>
         <button class="add" id="addBtn" aria-label="Add purchase">${icon('plus')}</button>
         <button data-v="goals">${icon('target')}<span>Goals</span></button>
-        <button data-v="report">${icon('chart')}<span>Report</span></button>
+        <button data-v="report">${icon('chart')}<span>Stats</span></button>
       </div></nav>`;
     document.querySelectorAll('nav [data-v]').forEach(b => b.onclick = () => go(b.dataset.v));
     $('#addBtn').onclick = () => openTx();
@@ -279,6 +354,7 @@
     showInstall();
     render();
     monthCheck();
+    if (S.bank && S.bank.lastSync !== today) syncBank(false);
   }
   function go(v, opts = {}) {
     view = v; if (opts.tab) budgetTab = opts.tab;
@@ -356,31 +432,42 @@
     const col = m.left < 0 ? 'var(--bad)' : pct < 0.15 ? 'var(--warn)' : 'var(--brand)';
     const R = 100, Cc = 2 * Math.PI * R, to = Cc * (1 - pct), from = lastRing ?? Cc;
     let sub;
-    if (noIncome) sub = 'Add your income to get started';
+    if (noIncome) sub = 'Add your income in Budget';
     else if (d.lastDay) sub = m.left > 0 ? 'Last day of the month.<br>What’s left can go to savings.' : 'Last day of the month';
     else if (m.left <= 0) sub = `${plural(d.daysLeft, 'day', 'days')} left · budget used up`;
     else sub = `${plural(d.daysLeft, 'day', 'days')} left<br>about ${kr(Math.floor(d.perDay))} a day`;
     const mon = monthLong(curYM, false);
     const total = Cx.totalSaved(S);
-    const recent = S.tx.filter(t => t.date <= today).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 4);
+    const recent = S.tx.filter(t => t.date <= today).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 3);
 
-    return header(`Hi${S.name ? ', ' + esc(S.name) : ''}`, monthLong(curYM), gearBtn()) +
-      demoBanner() +
-      `<section class="card hero" aria-label="Money left this month">
+    const top = Cx.topCategory(S, curYM), goal = S.goals[0];
+    const notice = warningCards(1) || dueCard() || saveTipCard() || weekCard() || backupCard();
+    const hero = !S.budgetSet
+      ? `<section class="card setup"><div class="ico big">${icon('wallet')}</div><h2>Let's set up your budget</h2>
+          <p class="muted">Tell Budgie what comes in and what goes out. It takes about 2 minutes.</p>
+          <button class="btn" data-act="setup">Set up your budget</button>
+          <button class="btn line" data-act="bank">${icon('bank')} Import from your bank</button></section>`
+      : `<section class="card hero" aria-label="Money left this month">
         <div class="ring"><svg viewBox="0 0 230 230" aria-hidden="true"><circle cx="115" cy="115" r="${R}" fill="none" stroke="var(--soft)" stroke-width="16"/>
           <circle class="arc" cx="115" cy="115" r="${R}" fill="none" stroke="${col}" stroke-width="16" stroke-linecap="round" stroke-dasharray="${Cc}" stroke-dashoffset="${from}" data-to="${to}"/></svg>
           <div class="c"><div class="l">Left in ${mon}</div>
             <div class="a" style="${m.left < 0 ? 'color:var(--bad)' : ''}">${kr(m.left)}</div>
             <div class="d">${sub}</div></div></div>
-        <div class="trio"><div><small>Income</small><b>${kr(m.income)}</b></div><div><small>Spent</small><b>${kr(m.fixed + m.spent)}</b></div><div><small>Saved in ${monthShort(curYM)}</small><b>${kr(m.saved)}</b></div></div>
-        ${S.goals.length || total ? `<button class="stash" data-act="go|goals">${icon('piggy')} Set aside in total: <b>${kr(total)}</b></button>` : ''}
-      </section>` +
-      (noIncome ? `<div class="card"><div class="sec"><h2>Get started</h2></div><p class="empty">Tell Budgie how much money you get each month – salary, pocket money or a student grant.</p><button class="btn" data-act="incomeSheet">Add income</button></div>` : '') +
-      warningCards() + dueCard() + saveTipCard() + weekCard() + backupCard() +
-      (!S.tx.length ? `<div class="card"><div class="sec"><h2>Your first purchase</h2></div><p class="empty">Bought something today? Tap + and add it – it takes 3 seconds.</p><button class="btn" data-act="openTx">${icon('plus')} Add purchase</button></div>` : '') +
-      catCard() +
+        <div class="trio"><div><small>Income</small><b>${kr(m.income)}</b></div><div><small>Spent</small><b>${kr(m.fixed + m.spent)}</b></div><div><small>Saved</small><b>${kr(total)}</b></div></div>
+      </section>`;
+    const tile = (ic, title, sub, act, color) => `<button class="tile" data-act="${act}"><span class="ico" style="background:${tint(color)};color:${color}">${icon(ic)}</span><b>${title}</b><small>${sub}</small></button>`;
+    const goalPct = goal ? Math.round(clamp(Cx.goalSaved(S, goal.id) / goal.target, 0, 1) * 100) : 0;
+    const tiles = `<section class="tiles" aria-label="Features">
+      ${tile('wallet', 'Budget', S.budgetSet ? `${plural(S.cats.length, 'category', 'categories')}` : 'Set it up', S.budgetSet ? 'go|budget|categories' : 'setup', '#4f46e5')}
+      ${tile('chart', 'Statistics', top ? `Most on ${esc(top.cat.name)}` : 'Where money goes', 'go|report', '#0284c7')}
+      ${tile('target', 'Goals', goal ? `${goalPct}% of ${esc(goal.name)}` : 'Save for something', 'go|goals', '#059669')}
+      ${tile('bank', S.bank ? esc(S.bank.name) : 'Connect bank', S.bank ? (S.bank.lastSyncAt ? 'Synced ' + dateLabel(S.bank.lastSync).toLowerCase() : 'Connected') : 'Import purchases', 'bank', '#ea580c')}
+    </section>`;
+
+    return header(`Hi${S.name ? ', ' + esc(S.name) : ''}`, monthLong(curYM), gearBtn()) +
+      demoBanner() + hero + notice + tiles +
       `<section class="card"><div class="sec"><h2>Latest purchases</h2>${S.tx.length ? `<button class="link" data-act="go|budget|purchases">See all</button>` : ''}</div>
-        ${recent.length ? recent.map(txRow).join('') : '<p class="empty">No purchases yet.</p>'}</section>
+        ${recent.length ? recent.map(txRow).join('') : `<p class="empty">No purchases yet. Tap <b>+</b> to add one – it takes 3 seconds.</p>`}</section>
       <p class="saved-at" id="savedAt">${savedAtText()}</p>`;
   }
 
@@ -389,8 +476,8 @@
     return `<div class="note info">${icon('info')}<div class="body">You're looking at <b>sample data</b>. Have a look around!
       <div class="acts"><button class="btn sm" data-act="startOwn">Start with my own numbers</button></div></div></div>`;
   }
-  function warningCards() {
-    const w = Cx.warnings(S, curYM).slice(0, 2);
+  function warningCards(max = 2) {
+    const w = Cx.warnings(S, curYM).slice(0, max);
     return w.map(x => {
       if (x.type === 'total') return `<div class="note bad" role="alert">${icon('alert')}<div class="body">You've spent <b>${kr(x.amount)}</b> more than you have this month. Try to hold back until next month.</div></div>`;
       if (x.type === 'over') return `<div class="note bad" role="alert">${icon('alert')}<div class="body"><b>${esc(x.cat.name)}</b> is ${kr(x.amount)} over budget.
@@ -430,20 +517,10 @@
     return `<div class="note info">${icon('download')}<div class="body">Time for a backup! Save a copy so you never lose your numbers.
       <div class="acts"><button class="btn sm" data-act="backup">Back up now</button><button class="btn sm on-note" data-act="dismissBackup">Later</button></div></div></div>`;
   }
-  function catCard() {
-    const st = Cx.catStatus(S, curYM), top = Cx.topCategory(S, curYM);
-    return `<section class="card"><div class="sec"><h2>Budget this month</h2><button class="link" data-act="go|budget|categories">Edit</button></div>
-      ${st.map(x => `<div class="row" style="align-items:flex-start">${icoBox(x.cat.icon, x.cat.color)}<div class="g">
-        <div style="display:flex;justify-content:space-between;gap:8px"><span class="t">${esc(x.cat.name)}</span>
-        <span class="small nowrap"><b class="num" style="color:${x.over ? 'var(--bad)' : 'var(--ink)'}">${kr(x.spent)}</b><span class="muted">${x.limit ? ' of ' + kr(x.limit) : ''}</span></span></div>
-        <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(x.pct * 100)}" aria-label="${esc(x.cat.name)}"><i style="width:${Math.min(100, x.pct * 100)}%;background:${x.over ? 'var(--bad)' : x.pct >= .8 ? 'var(--warn)' : x.cat.color}"></i></div>
-      </div></div>`).join('')}
-      ${top ? `<p class="small muted" style="margin:10px 0 0">You've spent the most on <b>${esc(top.cat.name)}</b> this month.</p>` : ''}</section>`;
-  }
   function txRow(t) {
     const c = catById(t.cat);
     return `<button class="row" data-act="openTx|${t.id}" id="tx-${t.id}">${icoBox(c.icon, c.color)}
-      <div class="g"><div class="t">${esc(t.note || c.name)}</div><div class="s">${t.note ? esc(c.name) + ' · ' : ''}${dateLabel(t.date)}</div></div>
+      <div class="g"><div class="t">${esc(t.note || c.name)}</div><div class="s">${t.note ? esc(c.name) + ' · ' : ''}${dateLabel(t.date)}${t.source === 'bank' ? ' · ' + icon('bank', 'tiny') + ' Bank' : ''}</div></div>
       <div class="v">−${kr(t.amount)}</div></button>`;
   }
 
@@ -535,8 +612,10 @@
       b = `<section class="card"><div class="sec"><h2>Categories</h2><span class="meta">${isPremium() ? 'Unlimited' : `${S.cats.length} of ${CFG.free.categories}`}</span></div>
         <p class="small muted" style="margin:0 0 4px">The limit is what you plan to spend per month. Tap to edit.</p>
         ${S.cats.map(c => { const sp = Cx.catSpent(S, c.id, curYM), lim = Cx.catLimit(S, c, curYM);
-          return `<button class="row" data-act="catSheet|${c.id}">${icoBox(c.icon, c.color)}<div class="g"><div class="t">${esc(c.name)}</div>
-          <div class="s">${kr(sp)} spent${lim ? ' of ' + kr(lim) : ' · no limit'}</div></div><span class="muted">${icon('right')}</span></button>`; }).join('')}
+          const pc = lim ? Math.min(1, sp / lim) : 0, over = lim && sp > lim;
+          return `<button class="row" data-act="catSheet|${c.id}">${icoBox(c.icon, c.color)}<div class="g"><div style="display:flex;justify-content:space-between;gap:8px"><span class="t">${esc(c.name)}</span>
+          <span class="small nowrap"><b class="num" style="color:${over ? 'var(--bad)' : 'var(--ink)'}">${kr(sp)}</b><span class="muted">${lim ? ' of ' + kr(lim) : ' · no limit'}</span></span></div>
+          <div class="bar"><i style="width:${pc * 100}%;background:${over ? 'var(--bad)' : pc >= .8 ? 'var(--warn)' : c.color}"></i></div></div></button>`; }).join('')}
         <div style="margin-top:10px">${max ? `<button class="btn soft" data-act="premium">${icon('lock')} More with Premium</button>` : `<button class="btn soft" data-act="catSheet">${icon('plus')} New category</button>`}</div></section>`;
     } else if (budgetTab === 'income') {
       b = `<section class="card"><div class="sec"><h2>Income</h2><span class="meta">${kr(Cx.incomeTotal(S))} / month</span></div>
@@ -772,7 +851,7 @@
       <section class="card no-print"><div class="sec"><h2>Export</h2><span class="pro">PREMIUM</span></div>
         <div class="btns"><button class="btn soft" data-act="csv">${icon('file')} Excel (CSV)</button><button class="btn soft" data-act="pdf">${icon('download')} PDF</button></div></section>`;
     } else extra = lockCard('Year overview & Excel/PDF export', 'See the whole year in one chart and take your numbers to Excel.');
-    return header('Report', 'Monthly report') + monthCard + extra + `<p class="small muted" style="text-align:center;margin-top:16px">${esc(CFG.texts.disclaimer)}</p>`;
+    return header('Statistics', 'Your money, month by month') + monthCard + extra + `<p class="small muted" style="text-align:center;margin-top:16px">${esc(CFG.texts.disclaimer)}</p>`;
   }
   function downloadBlob(blob, name) {
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
@@ -805,8 +884,14 @@
   // =====================================================================
   function settingsSheet() {
     const lb = S.settings.lastBackupAt;
+    const acc = Auth.current() || { name: S.name, email: '' };
     openSheet('Settings', `
-      <form id="nameForm" style="flex-direction:row;gap:8px;align-items:flex-end"><label class="f" style="flex:1">Your name<input name="n" value="${esc(S.name)}" autocomplete="given-name"></label><button class="btn sm soft" style="min-height:48px">Save</button></form>
+      <div class="row" style="padding-top:0"><div class="avatar">${esc((S.name || acc.name || '?').charAt(0).toUpperCase())}</div>
+        <div class="g"><div class="t">${esc(S.name || acc.name)}</div><div class="s">${acc.demo ? 'Sample data – nothing is saved' : esc(acc.email)}</div></div>
+        <button class="btn sm soft" id="logout">${icon('out')} ${acc.demo ? 'Exit' : 'Log out'}</button></div>
+      <form id="nameForm" style="flex-direction:row;gap:8px;align-items:flex-end;margin-top:6px"><label class="f" style="flex:1">Your name<input name="n" value="${esc(S.name)}" autocomplete="given-name"></label><button class="btn sm soft" style="min-height:48px">Save</button></form>
+      <button class="btn line" id="goBank" style="margin-top:12px">${icon('bank')} ${S.bank ? 'Bank: ' + esc(S.bank.name) : 'Connect your bank'}</button>
+      <button class="btn line" id="goSetup" style="margin-top:10px">${icon('wallet')} Set up budget again</button>
       <div class="card" style="margin:14px 0 10px"><div class="sec"><h2>Backup</h2><span class="meta">${icon('shield')}</span></div>
         <p class="small muted" style="margin:0 0 12px">Your numbers are saved on this device. ${lb ? `Last backup: ${fmtDate(lb, { day: 'numeric', month: 'long' })}.` : 'You haven’t made a backup yet.'}</p>
         <div class="btns"><button class="btn soft" id="bkSave">${icon('download')} Save backup</button><button class="btn soft" id="bkLoad">${icon('upload')} Restore</button></div></div>
@@ -814,7 +899,7 @@
       <div style="display:flex;flex-direction:column;gap:10px;margin-top:10px">
         <button class="btn line" id="goPrem">${icon('star')} ${isPremium() ? 'Budgie Premium (on)' : 'Budgie Premium'}</button>
         <button class="btn line" id="goPriv">${icon('shield')} Privacy</button>
-        <button class="btn danger" id="reset">${icon('trash')} ${S.demo ? 'Leave sample data' : 'Delete all my data'}</button>
+        ${acc.demo ? '' : `<button class="btn danger" id="reset">${icon('trash')} Delete my account</button>`}
       </div>
       <label class="toggle" style="margin-top:10px;border-top:1px solid var(--line)"><span><b style="display:block">Test mode: Premium</b><span class="small muted">For testing – no payment</span></span><input type="checkbox" id="premToggle" ${isPremium() ? 'checked' : ''}></label>
       <p class="small muted" style="text-align:center;margin:12px 0 0">${esc(CFG.texts.disclaimer)}</p>`);
@@ -825,7 +910,10 @@
     $('#premToggle').onchange = e => { S.premium = e.target.checked; save(); render(); toast(S.premium ? 'Premium on (test mode)' : 'Premium off'); };
     $('#goPrem').onclick = () => { closeSheet(); premiumSheet(); };
     $('#goPriv').onclick = () => { closeSheet(); privacySheet(); };
-    $('#reset').onclick = () => { closeSheet(); S.demo ? startOwn() : confirmSheet('Delete all data?', 'All your income, purchases and goals will be deleted from this device. Save a backup first if you want to keep them.', 'Delete everything', () => { St.clear(); S = null; showWelcome(); }); };
+    $('#logout').onclick = () => { closeSheet(); logout(); };
+    $('#goBank').onclick = () => { closeSheet(); bankSheet(); };
+    $('#goSetup').onclick = () => { closeSheet(); startOnboarding(); };
+    if ($('#reset')) $('#reset').onclick = () => { closeSheet(); confirmSheet('Delete your account?', 'Your account and all your income, purchases and goals will be deleted from this device. Save a backup first if you want to keep them.', 'Delete account', () => { St.clear(); Auth.deleteAccount(acc.email); S = null; lastRing = null; showAuth('signup'); toast('Account deleted'); }); };
   }
   async function backupNow() {
     const ok = await shareOrDownload(new Blob([St.exportJSON(S)], { type: 'application/json' }), `budgie-backup-${today}.json`, 'Budgie backup');
@@ -905,6 +993,8 @@
     dismissWeek: () => { S.settings.weekSeen = Cx.weekKey(today); save(); render(); },
     dismissBackup: () => { S.settings.backupNudgeAt = today; save(); render(); },
     backup: backupNow,
+    setup: () => startOnboarding(),
+    bank: () => bankSheet(),
     startOwn: () => startOwn(),
     txMonth: d => { txFilter.ym = Cx.addMonths(txFilter.ym, Number(d)); if (txFilter.ym > curYM) txFilter.ym = curYM; render(); },
     txCat: id => { txFilter.cat = id; render(); },
@@ -912,7 +1002,69 @@
     csv: exportCSV,
     pdf: () => { track('export-pdf'); window.print(); },
   };
-  function startOwn() { St.clear(); S = null; lastRing = null; startOnboarding(); }
+  function startOwn() { St.clear(); logout('signup'); }
+  function logout(mode = 'login') {
+    Auth.logOut(); S = null; lastRing = null; OB = null;
+    showAuth(Auth.hasAccounts() ? mode : 'signup');
+  }
+
+  // =====================================================================
+  //  BANK (Demo Bank nu – rigtig open banking senere, se js/bank.js)
+  // =====================================================================
+  function bankSheet() {
+    if (S.bank) {
+      const b = S.bank, n = S.tx.filter(t => t.source === 'bank').length;
+      openSheet(esc(b.name), `
+        <div class="note ${b.demo ? 'info' : 'ok'}">${icon('bank')}<div class="body"><b>Connected</b>${b.demo ? ' · DEMO' : ''}<br>
+          <span class="small">${plural(n, 'purchase', 'purchases')} imported${b.lastSyncAt ? ' · last synced ' + dateLabel(b.lastSync).toLowerCase() + ' ' + new Date(b.lastSyncAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : ''}</span></div></div>
+        <p class="small muted" style="margin:0 0 14px">Read-only access until ${fmtDate(b.consentUntil, { day: 'numeric', month: 'long', year: 'numeric' })}. Budgie can see purchases, but can never move money. Imported purchases are sorted into your categories automatically – tap one to change it.</p>
+        <button class="btn" id="bkSync">${icon('sync')} Sync now</button>
+        <button class="btn danger" id="bkOff" style="margin-top:10px">Disconnect</button>`);
+      $('#bkSync').onclick = () => syncBank(true);
+      $('#bkOff').onclick = () => { closeSheet(); confirmSheet('Disconnect bank?', 'Budgie stops fetching new purchases. Do you also want to remove the purchases that were imported?', 'Disconnect & remove', () => { withUndo('Bank disconnected', () => Bank.disconnect(S, true)); }); };
+      return;
+    }
+    openSheet('Connect your bank', `
+      <p class="muted" style="margin:0 0 6px">Import your purchases automatically instead of typing them in.</p>
+      ${[['eye', 'Read-only', 'Budgie can see purchases – never move money.'], ['shield', 'You approve it in your bank', 'You log in with MitID at your bank, never in Budgie.'], ['x', 'Disconnect any time', 'Your approval runs out by itself after 180 days.']]
+        .map(f => `<div class="feat"><div class="ico">${icon(f[0])}</div><div><b>${f[1]}</b><small>${f[2]}</small></div></div>`).join('')}
+      <div class="sec" style="margin-top:12px"><h2>Choose your bank</h2></div>
+      <button class="row" id="pickDemo">${icoBox('bank', '#ea580c')}<div class="g"><div class="t">Demo Bank</div><div class="s">Try it with sample purchases</div></div><span class="pro">DEMO</span></button>
+      ${Bank.COMING.map(n => `<div class="row" style="opacity:.55">${icoBox('bank', '#64748b')}<div class="g"><div class="t">${esc(n)}</div><div class="s">Coming later</div></div></div>`).join('')}
+      <p class="small muted" style="margin:12px 0 0">Real banks need a licensed open banking partner. Until then you can try the whole flow with Demo Bank.</p>`);
+    $('#pickDemo').onclick = () => bankConsent('demo');
+  }
+  function bankConsent(id) {
+    const p = Bank.PROVIDERS[id];
+    openSheet('Approve access', `
+      <div style="text-align:center;margin:4px 0 14px">${icoBox('bank', '#ea580c').replace('class="ico"', 'class="ico big" style="margin:0 auto 10px;')}<b>${esc(p.name)}</b> will share with Budgie:</div>
+      <div class="card" style="padding:4px 14px">
+        <div class="row">${icon('check')}<div class="g">Your purchases from the last 60 days</div></div>
+        <div class="row">${icon('check')}<div class="g">New purchases, once a day</div></div>
+        <div class="row" style="color:var(--muted)">${icon('x')}<div class="g">Budgie can never move money</div></div></div>
+      ${p.demo ? `<div class="note info">${icon('info')}<div class="body">This is a demo. No real bank is contacted and no login is needed.</div></div>` : ''}
+      <div class="btns"><button class="btn soft" data-close>Cancel</button><button class="btn" id="approve">Approve</button></div>`);
+    $('#sheet .btns [data-close]').onclick = closeSheet;
+    $('#approve').onclick = async () => {
+      $('#approve').disabled = true; $('#approve').innerHTML = `<span class="spin"></span> Connecting…`;
+      Bank.connect(S, id, today);
+      const n = await Bank.sync(S, today, uid);
+      save(); track('bank-connected'); closeSheet(); render();
+      openSheet('Your bank is connected', `<p style="margin:0 0 10px">We imported <b>${plural(n, 'purchase', 'purchases')}</b> and sorted them into your categories.</p>
+        <p class="small muted" style="margin:0 0 16px">Something in the wrong place? Tap the purchase to change its category.</p>
+        <button class="btn" id="seeTx">See purchases</button>`);
+      $('#seeTx').onclick = () => { closeSheet(); go('budget', { tab: 'purchases' }); };
+    };
+  }
+  async function syncBank(manual) {
+    if (!S.bank) return;
+    if (manual) { const b = $('#bkSync'); if (b) { b.disabled = true; b.innerHTML = `<span class="spin"></span> Syncing…`; } }
+    try {
+      const n = await Bank.sync(S, today, uid);
+      save(); if (manual) closeSheet(); render();
+      if (n || manual) toast(n ? `${plural(n, 'new purchase', 'new purchases')} from ${esc(S.bank.name)}` : 'You’re up to date');
+    } catch (e) { toast('Couldn’t reach your bank. Try again later.'); }
+  }
 
   // =====================================================================
   //  Installér på hjemmeskærm
@@ -923,10 +1075,16 @@
     const el = $('#install'); if (!el || standalone || framed) return;
     let x = false; try { x = localStorage.getItem('budgie-install-x'); } catch (e) { } if (x) return;
     let html = '';
-    if (deferredPrompt) html = `Add Budgie to your home screen.<div class="acts"><button class="btn sm" id="inst">Install</button></div>`;
-    else if (/iphone|ipad|ipod/i.test(navigator.userAgent)) html = `Add Budgie to your home screen: tap ${icon('share')} in Safari and choose <b>Add to Home Screen</b>.`;
+    const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    if (deferredPrompt) html = `<button class="btn sm" id="inst">Install</button>`;
+    else if (ios) html = `<button class="btn sm" id="instHow">How?</button>`;
     if (!html) return;
-    el.innerHTML = `<div class="note info">${icon('phone')}<div class="body">${html}</div><button class="icon-btn x" id="instX" aria-label="Hide">${icon('x')}</button></div>`;
+    el.innerHTML = `<div class="note info" style="align-items:center;padding:6px 6px 6px 14px">${icon('phone')}<div class="body">Add Budgie to your home screen</div>${html}<button class="icon-btn" id="instX" aria-label="Hide" style="color:inherit">${icon('x')}</button></div>`;
+    if ($('#instHow')) $('#instHow').onclick = () => {
+      openSheet('Add to home screen', `${[['share', 'Tap the share button', 'At the bottom of Safari'], ['plus', 'Choose “Add to Home Screen”', 'Scroll down a bit if you can’t see it'], ['check', 'Tap “Add”', 'Budgie now opens like a normal app']]
+        .map((f, i) => `<div class="feat"><div class="ico">${icon(f[0])}</div><div><b>${i + 1}. ${f[1]}</b><small>${f[2]}</small></div></div>`).join('')}<button class="btn soft" data-close style="margin-top:12px">Got it</button>`);
+      $('#sheet button.btn[data-close]').onclick = closeSheet;
+    };
     $('#instX').onclick = () => { try { localStorage.setItem('budgie-install-x', 1); } catch (e) { } el.innerHTML = ''; };
     if ($('#inst')) $('#inst').onclick = async () => { deferredPrompt.prompt(); await deferredPrompt.userChoice; deferredPrompt = null; el.innerHTML = ''; };
   }
@@ -939,8 +1097,8 @@
   $('#modal').addEventListener('click', e => { if (e.target.id === 'modal') closeSheet(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#modal').classList.contains('open')) closeSheet(); });
   loadAnalytics();
-  S = St.load();
-  if (S) startApp(); else showWelcome();
+  const acc = Auth.current();
+  if (acc) enterApp(acc, false); else showAuth(Auth.hasAccounts() ? 'login' : 'signup');
 
   // Til test i konsollen
   window.Budgie = { get state() { return S; }, setToday(iso) { today = iso; curYM = iso.slice(0, 7); repYM = null; txFilter.ym = null; if (S) { render(); monthCheck(); } } };

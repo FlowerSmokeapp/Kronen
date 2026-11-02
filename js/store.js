@@ -1,7 +1,8 @@
 /* Budgie – lagring på enheden, backup (JSON) og eksempeldata. */
 (function () {
-  const KEY = 'budgie:v2';
-  const VERSION = 2;
+  const LEGACY_KEY = 'budgie:v2';
+  let KEY = LEGACY_KEY;
+  const VERSION = 3;
   const uid = () => Math.random().toString(36).slice(2, 10);
   let memory = null; // reserve, hvis localStorage er slået fra
 
@@ -10,7 +11,9 @@
     return {
       version: VERSION, createdAt: today, startMonth: C.ymOf(today), lastMonthSeen: C.ymOf(today),
       name: '', demo: false, premium: false,
-      incomes: [], fixed: [], cats: [], tx: [], goals: [], deposits: [], paid: {}, limitAdjust: {},
+      incomes: [], fixed: [], tx: [], goals: [], deposits: [], paid: {}, limitAdjust: {}, bank: null, budgetSet: false,
+      // Kategorierne findes fra start (så bank-køb kan sorteres), grænserne sættes i "Set up your budget"
+      cats: window.BUDGIE_CONFIG.categories.map(c => ({ id: uid(), name: c.name, icon: c.icon, color: c.color, limit: 0 })),
       settings: { saveSuggest: true, lastCat: null, lastBackupAt: null, backupNudgeAt: null, weekSeen: null, saveSuggestDismissed: null },
       events: {}, waitlist: null, savedAt: null,
     };
@@ -29,6 +32,15 @@
     try { localStorage.setItem(KEY, JSON.stringify(s)); return true; } catch (e) { return false; }
   }
   function clear() { memory = null; try { localStorage.removeItem(KEY); } catch (e) {} }
+  /** Skift til en kontos egne data. Første konto på enheden overtager evt. data fra før der var konti. */
+  function useAccount(id, adoptLegacy) {
+    KEY = 'budgie:data:' + id; memory = null;
+    if (!adoptLegacy) return;
+    try {
+      const old = localStorage.getItem(LEGACY_KEY);
+      if (old && !localStorage.getItem(KEY)) { localStorage.setItem(KEY, old); localStorage.removeItem(LEGACY_KEY); }
+    } catch (e) { }
+  }
 
   /** Udfyld manglende felter (så ældre backups stadig virker). */
   function normalize(s) {
@@ -38,6 +50,7 @@
     out.settings = Object.assign(b.settings, s.settings || {});
     for (const k of ['incomes', 'fixed', 'cats', 'tx', 'goals', 'deposits']) if (!Array.isArray(out[k])) out[k] = [];
     out.events = out.events || {}; out.paid = out.paid || {}; out.limitAdjust = out.limitAdjust || {};
+    if (s.budgetSet === undefined) out.budgetSet = (s.incomes || []).length > 0;
     out.version = VERSION;
     return out;
   }
@@ -61,7 +74,7 @@
     let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647; // samme data hver gang
     const s = blank(today);
     const ym = C.ymOf(today);
-    s.demo = true; s.name = 'Emma'; s.startMonth = C.addMonths(ym, -9); s.lastMonthSeen = ym; s.createdAt = C.addDays(today, -60);
+    s.demo = true; s.name = 'Emma'; s.budgetSet = true; s.startMonth = C.addMonths(ym, -9); s.lastMonthSeen = ym; s.createdAt = C.addDays(today, -60);
     s.settings.lastBackupAt = today;
     s.incomes = [{ id: uid(), name: 'Part-time job', kind: 'Salary', amount: 3200, day: 15 }, { id: uid(), name: 'Pocket money', kind: 'Pocket money', amount: 500, day: 1 }];
     s.fixed = [{ id: uid(), name: 'Phone', amount: 129, day: 5, icon: 'phone' }, { id: uid(), name: 'Streaming', amount: 99, day: 12, icon: 'play' },
@@ -90,5 +103,5 @@
     return s;
   }
 
-  window.Store = { KEY, uid, blank, load, save, clear, normalize, exportJSON, importJSON, demo };
+  window.Store = { uid, blank, load, save, clear, useAccount, normalize, exportJSON, importJSON, demo };
 })();

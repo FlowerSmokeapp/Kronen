@@ -62,10 +62,11 @@ window.BUDGIE_CONFIG = {
   // ---------- Tekster (appen er på engelsk) ----------
   texts: {
     welcomeTitle: "Hi! I'm Budgie",
-    welcomeText: 'Get on top of your money in 2 minutes. No login, no bank – your numbers stay on your phone.',
+    welcomeText: 'Get on top of your money in 2 minutes. See what you have left, save for your goals and get a heads-up before you overspend.',
     privacy: [
-      'Your numbers are only stored on this device. They are never sent to us or anyone else.',
-      'Budgie has no bank connection and no login.',
+      'Your account and numbers are stored on this device. They are never sent to us or anyone else.',
+      'Your password is never stored – only a scrambled version (hash) of it.',
+      'A bank connection is read-only: Budgie can see purchases, but can never move money. You can disconnect at any time.',
       'If analytics is on, we only count anonymous events (like "first purchase"). Never amounts, names or emails.',
       'Make a backup now and then – if you delete the app or clear your browser data, your numbers are gone.',
     ],

@@ -255,3 +255,37 @@ nav.bottom .add svg.i { width: 1.75rem; height: 1.75rem; stroke-width: 2.2; }
   body { background: #fff; }
   .card { break-inside: avoid; box-shadow: none; }
 }
+
+/* ---------- Forside: funktioner ---------- */
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+.tile { background: var(--card); border: 1px solid var(--line); border-radius: var(--r); padding: 14px; min-height: 104px; text-align: left;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px; box-shadow: var(--shadow); transition: transform .1s; }
+.tile:active { transform: scale(.98); }
+.tile .ico { margin-bottom: 8px; }
+.tile b { font-size: .9375rem; }
+.tile small { color: var(--muted); font-size: .8125rem; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.setup { text-align: center; padding: 24px 18px; display: flex; flex-direction: column; gap: 10px; align-items: stretch; }
+.setup h2 { margin: 4px 0 0; font-size: 1.25rem; letter-spacing: -.02em; }
+.setup p { margin: 0 0 6px; }
+.ico.big { width: 56px; height: 56px; border-radius: 18px; margin: 0 auto; background: var(--brand-soft); color: var(--brand); }
+.ico.big svg.i { width: 1.75rem; height: 1.75rem; }
+svg.i.tiny { width: .9em; height: .9em; vertical-align: -.12em; }
+.avatar { width: 44px; height: 44px; border-radius: 50%; background: var(--brand-soft); color: var(--brand); font-weight: 700; display: flex; align-items: center; justify-content: center; flex: none; }
+.spin { width: 18px; height: 18px; border-radius: 50%; border: 2.5px solid rgba(255, 255, 255, .4); border-top-color: #fff; animation: sp .8s linear infinite; display: inline-block; }
+@keyframes sp { to { transform: rotate(360deg); } }
+
+/* ---------- Konto ---------- */
+.auth { justify-content: center; }
+.auth .logo { margin-bottom: 8px; }
+.pw { position: relative; display: block; }
+.pw input { padding-right: 52px; }
+.pw .icon-btn { position: absolute; right: 2px; top: 50%; transform: translateY(-50%); }
+
+/* ---------- Premium-tilbud ---------- */
+.offer { position: relative; padding-top: calc(64px + env(safe-area-inset-top)); }
+.framed .offer { padding-top: 96px; }
+.offer .close { position: absolute; top: calc(12px + env(safe-area-inset-top)); right: 16px; }
+.framed .offer .close { top: 52px; }
+.offer h1 { margin-top: 10px; }
+.offer .lead { margin-bottom: 6px; }
+.offer-list .feat { padding: 9px 0; }
