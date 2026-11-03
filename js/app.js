@@ -197,6 +197,7 @@
     let plan = 'year';
     const saving = Math.round((1 - CFG.prices.year / (CFG.prices.month * 12)) * 100);
     const feats = [
+      ['bank', 'Automatic bank sync', 'Connect once – your purchases come in by themselves'],
       ['wallet', 'Unlimited categories', `Free has ${CFG.free.categories}`],
       ['target', 'Unlimited savings goals', `Free has ${CFG.free.goals}`],
       ['chart', 'Year overview', 'See all 12 months in one chart'],
@@ -392,7 +393,7 @@
     showInstall();
     render();
     monthCheck();
-    if (S.bank && S.bank.lastSync !== today) syncBank(false);
+    handleBankReturn().then(() => { if (bankDue()) syncBank(false); });
   }
   function go(v, opts = {}) {
     view = v; if (opts.tab) budgetTab = opts.tab;
@@ -479,7 +480,7 @@
     const recent = S.tx.filter(t => t.date <= today).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 3);
 
     const top = Cx.topCategory(S, curYM), goal = S.goals[0];
-    const notice = warningCards(1) || dueCard() || saveTipCard() || weekCard() || backupCard();
+    const notice = warningCards(1) || bankNotice() || dueCard() || saveTipCard() || weekCard() || backupCard();
     const hero = !S.budgetSet
       ? `<section class="card setup"><div class="ico big">${icon('wallet')}</div><h2>Let's set up your budget</h2>
           <p class="muted">Tell Budgie what comes in and what goes out. It takes about 2 minutes.</p>
@@ -499,7 +500,7 @@
       ${tile('wallet', 'Budget', S.budgetSet ? `${plural(S.cats.length, 'category', 'categories')}` : 'Set it up', S.budgetSet ? 'go|budget|categories' : 'setup', '#4f46e5')}
       ${tile('chart', 'Statistics', top ? `Most on ${esc(top.cat.name)}` : 'Where money goes', 'go|report', '#0284c7')}
       ${tile('target', 'Goals', goal ? `${goalPct}% of ${esc(goal.name)}` : 'Save for something', 'go|goals', '#059669')}
-      ${tile('bank', S.bank ? esc(S.bank.name) : 'Connect bank', S.bank ? (S.bank.lastSyncAt ? 'Synced ' + dateLabel(S.bank.lastSync).toLowerCase() : 'Connected') : 'Import purchases', 'bank', '#ea580c')}
+      ${tile('bank', S.bank ? esc(S.bank.name) : 'Connect bank', S.bank ? (!isPremium() ? 'Paused' : S.bank.lastSyncAt ? 'Synced ' + dateLabel(S.bank.lastSync).toLowerCase() : 'Connected') : isPremium() ? 'Automatic sync' : `${icon('lock', 'tiny')} Premium`, 'bank', '#ea580c')}
     </section>`;
 
     return header(`Hi${S.name ? ', ' + esc(S.name) : ''}`, monthLong(curYM), gearBtn()) +
@@ -990,6 +991,7 @@
       <div class="seg" id="plans"><button class="" data-plan="month">${CFG.prices.month} kr.<small>per month</small></button><button class="on" data-plan="year">${CFG.prices.year} kr.<small>per year · save ${saving}%</small></button></div>
       <table class="compare"><tr><th></th><th>Free</th><th>Premium</th></tr>
         <tr><td>Monthly budget & report</td><td>${yes}</td><td>${yes}</td></tr>
+        <tr><td>Automatic bank sync</td><td>${no}</td><td>${yes}</td></tr>
         <tr><td>Categories</td><td>${CFG.free.categories}</td><td>Unlimited</td></tr>
         <tr><td>Savings goals</td><td>${CFG.free.goals}</td><td>Unlimited</td></tr>
         <tr><td>Backup (JSON)</td><td>${yes}</td><td>${yes}</td></tr>
@@ -1037,6 +1039,7 @@
     backup: backupNow,
     setup: () => startOnboarding(),
     bank: () => bankSheet(),
+    bankRenew: () => bankRenew(),
     startOwn: () => startOwn(),
     txMonth: d => { txFilter.ym = Cx.addMonths(txFilter.ym, Number(d)); if (txFilter.ym > curYM) txFilter.ym = curYM; render(); },
     txCat: id => { txFilter.cat = id; render(); },
@@ -1055,56 +1058,130 @@
   // =====================================================================
   //  BANK (Demo Bank nu – rigtig open banking senere, se js/bank.js)
   // =====================================================================
+  // Bankforbindelse er en Premium-funktion: forbind én gang, derefter synkroniseres der af sig selv.
+  const PENDING = 'budgie:bank-pending';
   function bankSheet() {
-    if (S.bank) {
-      const b = S.bank, n = S.tx.filter(t => t.source === 'bank').length;
-      openSheet(esc(b.name), `
-        <div class="note ${b.demo ? 'info' : 'ok'}">${icon('bank')}<div class="body"><b>Connected</b>${b.demo ? ' · DEMO' : ''}<br>
-          <span class="small">${plural(n, 'purchase', 'purchases')} imported${b.lastSyncAt ? ' · last synced ' + dateLabel(b.lastSync).toLowerCase() + ' ' + new Date(b.lastSyncAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : ''}</span></div></div>
-        <p class="small muted" style="margin:0 0 14px">Read-only access until ${fmtDate(b.consentUntil, { day: 'numeric', month: 'long', year: 'numeric' })}. Budgie can see purchases, but can never move money. Imported purchases are sorted into your categories automatically – tap one to change it.</p>
-        <button class="btn" id="bkSync">${icon('sync')} Sync now</button>
-        <button class="btn soft" id="bkCsv" style="margin-top:10px">${icon('upload')} Import a file from your netbank</button>
-        <button class="btn danger" id="bkOff" style="margin-top:10px">Disconnect</button>`);
-      $('#bkSync').onclick = () => syncBank(true);
-      $('#bkCsv').onclick = csvSheet;
-      $('#bkOff').onclick = () => { closeSheet(); confirmSheet('Disconnect bank?', 'Budgie stops fetching new purchases. Do you also want to remove the purchases that were imported?', 'Disconnect & remove', () => { withUndo('Bank disconnected', () => Bank.disconnect(S, true)); }); };
-      return;
-    }
-    openSheet('Get purchases from your bank', `
-      <button class="row" id="bkCsv" style="border:1px solid var(--line);border-radius:16px;padding:10px 12px">${icoBox('upload', '#059669')}<div class="g"><div class="t">Import a file from your netbank</div><div class="s">Works with all banks today · CSV file</div></div><span class="muted">${icon('right')}</span></button>
-      <div class="sec" style="margin-top:18px"><h2>Connect automatically</h2></div>
-      <p class="muted small" style="margin:0 0 6px">New purchases come in by themselves every day.</p>
-      ${[['eye', 'Read-only', 'Budgie can see purchases – never move money.'], ['shield', 'You approve it in your bank', 'You log in with MitID at your bank, never in Budgie.'], ['x', 'Disconnect any time', 'Your approval runs out by itself after 180 days.']]
-        .map(f => `<div class="feat"><div class="ico">${icon(f[0])}</div><div><b>${f[1]}</b><small>${f[2]}</small></div></div>`).join('')}
-      <div class="sec" style="margin-top:12px"><h2>Choose your bank</h2></div>
-      <button class="row" id="pickDemo">${icoBox('bank', '#ea580c')}<div class="g"><div class="t">Demo Bank</div><div class="s">Try it with sample purchases</div></div><span class="pro">DEMO</span></button>
-      ${Bank.COMING.map(n => `<div class="row" style="opacity:.55">${icoBox('bank', '#64748b')}<div class="g"><div class="t">${esc(n)}</div><div class="s">Coming later</div></div></div>`).join('')}
-      <p class="small muted" style="margin:12px 0 0">Real banks need a licensed open banking partner. Until then you can try the whole flow with Demo Bank.</p>`);
-    $('#pickDemo').onclick = () => bankConsent('demo');
-    $('#bkCsv').onclick = csvSheet;
+    if (S.bank) return bankStatusSheet();
+    if (!isPremium()) return bankPremiumGate();
+    bankPickSheet();
   }
-  function bankConsent(id) {
+  const bankPoints = () => [['sync', 'Set it up once', 'New purchases come in by themselves – no typing, no files.'], ['eye', 'Read-only', 'Budgie can see purchases – never move money.'], ['shield', 'You approve it in your bank', 'With MitID at your bank – never in Budgie.']]
+    .map(f => `<div class="feat"><div class="ico">${icon(f[0])}</div><div><b>${f[1]}</b><small>${f[2]}</small></div></div>`).join('');
+  function bankPremiumGate() {
+    track('bank-premium-gate');
+    openSheet('Connect your bank', `<div class="lockcard" style="padding:4px 0 6px"><div class="ico">${icon('lock')}</div><b>Automatic bank sync is part of Premium</b></div>
+      ${bankPoints()}<button class="btn" id="gp" style="margin-top:12px">${icon('star')} See Premium</button>`);
+    $('#gp').onclick = () => { closeSheet(); premiumSheet(); };
+  }
+  function bankPickSheet() {
+    const real = Bank.realBanks();
+    openSheet('Connect your bank', `${bankPoints()}
+      <div class="sec" style="margin-top:14px"><h2>Choose your bank</h2></div>
+      ${real ? `<input id="bankQ" type="search" placeholder="Search for your bank" autocomplete="off"><div id="bankList" style="margin-top:6px"><p class="empty" style="text-align:center"><span class="spin dark" style="width:22px;height:22px"></span></p></div>`
+        : `<button class="row" id="pickDemo">${icoBox('bank', '#ea580c')}<div class="g"><div class="t">Demo Bank</div><div class="s">Try it with sample purchases</div></div><span class="pro">DEMO</span></button>
+           ${Bank.COMING.map(n => `<div class="row" style="opacity:.55">${icoBox('bank', '#64748b')}<div class="g"><div class="t">${esc(n)}</div><div class="s">Coming soon</div></div></div>`).join('')}`}
+      <button class="btn sm soft" id="bkCsv" style="margin:12px auto 0;display:flex;background:none">Bank not listed? Import a file instead</button>`);
+    $('#bkCsv').onclick = csvSheet;
+    if (!real) { $('#pickDemo').onclick = () => bankConsent('demo', 'Demo Bank'); return; }
+    Bank.PROVIDERS.enable.banks('DK').then(banks => {
+      const draw = q => {
+        const list = banks.filter(b => !q || b.name.toLowerCase().includes(q.toLowerCase()));
+        $('#bankList').innerHTML = list.map(b => `<button class="row" data-bank="${esc(b.name)}">${b.logo ? `<img src="${esc(b.logo)}" alt="" class="ico" style="object-fit:contain;background:#fff;padding:6px">` : icoBox('bank', '#ea580c')}<div class="g"><div class="t">${esc(b.name)}</div></div><span class="muted">${icon('right')}</span></button>`).join('') || '<p class="empty">No bank found.</p>';
+        document.querySelectorAll('#bankList [data-bank]').forEach(x => x.onclick = () => bankConsent('enable', x.dataset.bank));
+      };
+      draw(''); $('#bankQ').oninput = e => draw(e.target.value);
+    }).catch(() => { $('#bankList').innerHTML = `<p class="empty">Couldn't load the list of banks. Check your connection and try again.</p>`; });
+  }
+  function bankConsent(id, bankName) {
     const p = Bank.PROVIDERS[id];
     openSheet('Approve access', `
-      <div style="text-align:center;margin:4px 0 14px">${icoBox('bank', '#ea580c').replace('class="ico"', 'class="ico big" style="margin:0 auto 10px;')}<b>${esc(p.name)}</b> will share with Budgie:</div>
+      <div style="text-align:center;margin:4px 0 14px">${icoBox('bank', '#ea580c').replace('class="ico"', 'class="ico big" style="margin:0 auto 10px;')}<b>${esc(bankName)}</b> will share with Budgie:</div>
       <div class="card" style="padding:4px 14px">
         <div class="row">${icon('check')}<div class="g">Your purchases from the last 60 days</div></div>
-        <div class="row">${icon('check')}<div class="g">New purchases, once a day</div></div>
+        <div class="row">${icon('check')}<div class="g">New purchases, automatically</div></div>
         <div class="row" style="color:var(--muted)">${icon('x')}<div class="g">Budgie can never move money</div></div></div>
-      ${p.demo ? `<div class="note info">${icon('info')}<div class="body">This is a demo. No real bank is contacted and no login is needed.</div></div>` : ''}
-      <div class="btns"><button class="btn soft" data-close>Cancel</button><button class="btn" id="approve">Approve</button></div>`);
+      ${p.demo ? `<div class="note info">${icon('info')}<div class="body">This is a demo. No real bank is contacted and no login is needed.</div></div>`
+        : `<p class="small muted" style="margin:0 0 12px">You'll go to ${esc(bankName)} and approve with MitID. Afterwards you come straight back to Budgie. The approval lasts up to 180 days (EU rule) – we'll remind you before it runs out.</p>`}
+      <div class="btns"><button class="btn soft" data-close>Cancel</button><button class="btn" id="approve">${p.demo ? 'Approve' : 'Continue to bank'}</button></div>`);
     $('#sheet .btns [data-close]').onclick = closeSheet;
     $('#approve').onclick = async () => {
-      $('#approve').disabled = true; $('#approve').innerHTML = `<span class="spin"></span> Connecting…`;
-      Bank.connect(S, id, today);
-      const n = await Bank.sync(S, today, uid);
-      save(); track('bank-connected'); closeSheet(); render();
-      openSheet('Your bank is connected', `<p style="margin:0 0 10px">We imported <b>${plural(n, 'purchase', 'purchases')}</b> and sorted them into your categories.</p>
-        <p class="small muted" style="margin:0 0 16px">Something in the wrong place? Tap the purchase to change its category.</p>
-        <button class="btn" id="seeTx">See purchases</button>`);
-      $('#seeTx').onclick = () => { closeSheet(); go('budget', { tab: 'purchases' }); };
+      const btn = $('#approve'); btn.disabled = true; btn.innerHTML = `<span class="spin"></span> ${p.demo ? 'Connecting…' : 'Opening your bank…'}`;
+      if (p.demo) { Bank.connect(S, 'demo', today, { bank: 'Demo Bank' }); return bankConnected(); }
+      try {
+        const state = Array.from(crypto.getRandomValues(new Uint8Array(12)), x => x.toString(16).padStart(2, '0')).join('');
+        localStorage.setItem(PENDING, JSON.stringify({ state, bank: bankName, at: Date.now() }));
+        const back = new URL('app.html', location.href).href.split('?')[0]; // skal også stå i Enable Banking som "redirect URL"
+        const url = await p.start(bankName, back, state);
+        await St.flush();
+        track('bank-redirect');
+        (framed ? window.top : window).location.href = url;
+      } catch (e) { btn.disabled = false; btn.textContent = 'Try again'; toast('Couldn’t reach the bank. Try again in a moment.'); }
     };
   }
+  async function bankConnected() {
+    let n = 0;
+    try { n = await Bank.sync(S, today, uid); } catch (e) { }
+    save(); track('bank-connected'); closeSheet(); render();
+    openSheet('Your bank is connected', `<p style="margin:0 0 10px">We imported <b>${plural(n, 'purchase', 'purchases')}</b> and sorted them into your categories.</p>
+      <p class="small muted" style="margin:0 0 16px">From now on new purchases come in by themselves. Something in the wrong place? Tap the purchase to change its category.</p>
+      <button class="btn" id="seeTx">See purchases</button>`);
+    $('#seeTx').onclick = () => { closeSheet(); go('budget', { tab: 'purchases' }); };
+  }
+  /** Når brugeren kommer tilbage fra banken (…/app.html?code=…&state=…) */
+  async function handleBankReturn() {
+    const q = new URLSearchParams(location.search);
+    if (!q.has('code') && !q.has('error')) return;
+    history.replaceState(null, '', location.pathname + location.hash);
+    let pending = null; try { pending = JSON.parse(localStorage.getItem(PENDING)); localStorage.removeItem(PENDING); } catch (e) { }
+    if (q.has('error') || !pending) { toast('The bank connection was cancelled'); return; }
+    if (pending.state !== q.get('state')) { toast('Something went wrong – please try connecting again'); return; }
+    openSheet('Connecting your bank', `<div class="loader" style="min-height:160px"><div class="spin dark"></div><p class="muted small">Fetching your purchases…</p></div>`);
+    try {
+      const info = await Bank.PROVIDERS.enable.finish(q.get('code'));
+      Bank.connect(S, 'enable', today, { session: info.session, validUntil: info.validUntil, bank: info.bank || pending.bank, accounts: info.accounts });
+      await bankConnected();
+    } catch (e) { closeSheet(); toast('Couldn’t finish the connection. Please try again.'); }
+  }
+  function bankStatusSheet() {
+    const b = S.bank, n = S.tx.filter(t => t.source === 'bank').length, left = Bank.consentDaysLeft(S, today), paused = !isPremium();
+    const expired = b.expired || (left !== null && left < 0);
+    openSheet(esc(b.name), `
+      <div class="note ${paused || expired ? 'warn' : b.demo ? 'info' : 'ok'}">${icon(paused ? 'lock' : expired ? 'alert' : 'bank')}<div class="body">
+        <b>${paused ? 'Sync paused' : expired ? 'Approval has run out' : 'Connected – syncs automatically'}</b>${b.demo ? ' · DEMO' : ''}<br>
+        <span class="small">${plural(n, 'purchase', 'purchases')} imported${b.lastSyncAt ? ' · last synced ' + dateLabel(b.lastSync).toLowerCase() + ' ' + new Date(b.lastSyncAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : ''}</span></div></div>
+      ${paused ? `<p class="small muted" style="margin:0 0 12px">Automatic bank sync is a Premium feature. Your imported purchases stay in Budgie.</p><button class="btn" id="gp">${icon('star')} See Premium</button>`
+        : `<p class="small muted" style="margin:0 0 14px">${expired ? 'Renew with one tap to keep your purchases coming in.' : `Approved until <b>${fmtDate(b.consentUntil, { day: 'numeric', month: 'long', year: 'numeric' })}</b>${left !== null && left <= CFG.bankRenewDays ? ` – that's in ${plural(left, 'day', 'days')}` : ''}. Budgie fetches new purchases every time you open the app.`}</p>
+           ${expired || (left !== null && left <= CFG.bankRenewDays) ? `<button class="btn" id="bkRenew">${icon('sync')} Renew approval</button>` : `<button class="btn soft" id="bkSync">${icon('sync')} Sync now</button>`}
+           <button class="btn sm soft" id="bkCsv" style="margin:10px auto 0;display:flex;background:none">Missing something? Import a file</button>`}
+      <button class="btn danger" id="bkOff" style="margin-top:10px">Disconnect</button>`);
+    if ($('#gp')) $('#gp').onclick = () => { closeSheet(); premiumSheet(); };
+    if ($('#bkSync')) $('#bkSync').onclick = () => syncBank(true);
+    if ($('#bkRenew')) $('#bkRenew').onclick = bankRenew;
+    if ($('#bkCsv')) $('#bkCsv').onclick = csvSheet;
+    $('#bkOff').onclick = () => { closeSheet(); confirmSheet('Disconnect bank?', 'Budgie stops fetching purchases and removes the ones it imported.', 'Disconnect', async () => { await Bank.disconnect(S, true); save(); render(); toast('Bank disconnected'); }); };
+  }
+  function bankRenew() {
+    if (!isPremium()) return bankPremiumGate();
+    if (S.bank.provider === 'demo') { Bank.connect(S, 'demo', today, { bank: S.bank.name }); save(); closeSheet(); render(); toast('Approval renewed for 180 days'); syncBank(false); return; }
+    bankConsent(S.bank.provider, S.bank.name);
+  }
+  function bankNotice() {
+    if (!S.bank) return '';
+    const left = Bank.consentDaysLeft(S, today);
+    if (!isPremium()) return `<div class="note info">${icon('lock')}<div class="body">Bank sync is paused – it's part of Premium.<div class="acts"><button class="btn sm" data-act="premium">See Premium</button></div></div></div>`;
+    if (S.bank.expired || (left !== null && left < 0)) return `<div class="note bad">${icon('bank')}<div class="body">Your bank approval has run out, so new purchases aren't coming in.<div class="acts"><button class="btn sm on-note" data-act="bankRenew">Renew – takes 1 minute</button></div></div></div>`;
+    if (left !== null && left <= CFG.bankRenewDays) return `<div class="note warn">${icon('bank')}<div class="body">Your bank approval runs out in ${plural(left, 'day', 'days')}. Renew it so purchases keep coming in.<div class="acts"><button class="btn sm on-note" data-act="bankRenew">Renew now</button></div></div></div>`;
+    return '';
+  }
+  /** Skal banken synkroniseres nu? (Premium, ikke udløbet, og mere end X timer siden sidst) */
+  function bankDue() {
+    if (!S || !S.bank || !isPremium() || S.bank.expired) return false;
+    const last = S.bank.lastSyncAt ? Date.parse(S.bank.lastSyncAt) : 0;
+    return S.bank.lastSync !== today || Date.now() - last > CFG.bankSyncHours * 3600e3;
+  }
+  setInterval(() => { if (bankDue() && document.visibilityState === 'visible') syncBank(false); }, 15 * 60e3);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && bankDue()) syncBank(false); });
+
   // ---------- Import af fil fra netbanken (CSV) ----------
   function csvSheet() {
     openSheet('Import from your netbank', `
@@ -1138,14 +1215,20 @@
       inp.click();
     };
   }
+  let syncing = false;
   async function syncBank(manual) {
-    if (!S.bank) return;
+    if (!S || !S.bank || syncing) return;
+    if (!isPremium()) { if (manual) bankPremiumGate(); return; }
+    syncing = true;
     if (manual) { const b = $('#bkSync'); if (b) { b.disabled = true; b.innerHTML = `<span class="spin"></span> Syncing…`; } }
     try {
       const n = await Bank.sync(S, today, uid);
       save(); if (manual) closeSheet(); render();
       if (n || manual) toast(n ? `${plural(n, 'new purchase', 'new purchases')} from ${esc(S.bank.name)}` : 'You’re up to date');
-    } catch (e) { toast('Couldn’t reach your bank. Try again later.'); }
+    } catch (e) {
+      if (e.code === 'expired') { S.bank.expired = true; save(); render(); if (manual) { closeSheet(); bankStatusSheet(); } }
+      else if (manual) toast('Couldn’t reach your bank. Try again later.');
+    } finally { syncing = false; }
   }
 
   // =====================================================================
@@ -1179,6 +1262,7 @@
   $('#modal').addEventListener('click', e => { if (e.target.id === 'modal') closeSheet(); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#modal').classList.contains('open')) closeSheet(); });
   loadAnalytics();
+  Bank.init(CFG.bankApi);
   $('#root').innerHTML = '<div class="loader"><div class="spin dark"></div></div>';
   Auth.init().catch(e => { console.error(e); bootError = true; }).finally(() => {
     if (bootError && Auth.CLOUD) {

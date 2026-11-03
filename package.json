@@ -3,6 +3,6 @@
   "private": true,
   "description": "Budgie – budget-app for unge (PWA, data gemmes lokalt)",
   "scripts": {
-    "test": "node --test tests/calc.test.js tests/bank.test.js tests/csv.test.js"
+    "test": "node --test tests/calc.test.js tests/bank.test.js tests/csv.test.js tests/worker.test.mjs"
   }
 }

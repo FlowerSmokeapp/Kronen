@@ -37,8 +37,10 @@ test('Synkronisering henter kun nye dage og kan afbrydes', async () => {
   const first = await Bank.sync(s, '2026-11-02', uid);
   assert.ok(first > 10, 'henter ca. 60 dages køb');
   assert.equal(await Bank.sync(s, '2026-11-02', uid), 0);
+  assert.equal(Bank.consentDaysLeft(s, '2026-11-02'), 180);
+  await assert.rejects(Bank.sync(s, '2027-05-02', uid), e => e.code === 'expired');
   s.tx.push({ id: 'manual', source: 'manual' });
-  Bank.disconnect(s, true);
+  await Bank.disconnect(s, true);
   assert.deepEqual(s.tx.map(t => t.id), ['manual']);
   assert.equal(s.bank, null);
 });

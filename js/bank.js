@@ -76,24 +76,65 @@
   // "NETTO KBH" → "Netto Kbh", men korte forkortelser som DSB og H&M bevares
   const tidy = t => String(t).replace(/\/bill$/i, '').split(/(\s+)/).map(w => /^[A-ZÆØÅ&]{2,3}$/.test(w) ? w : w.toLowerCase().replace(/(^|[&/.-])\S/g, m => m.toUpperCase())).join('');
 
+  // ---------- Rigtige banker via Budgie bank-serveren (server/worker.mjs) ----------
+  function apiProvider(base) {
+    base = base.replace(/\/$/, '');
+    const call = async (path, opts) => {
+      const r = await fetch(base + path, opts);
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { const e = new Error(d.error || 'Bank error'); e.code = d.code || 'bank_error'; throw e; }
+      return d;
+    };
+    const post = (path, body) => call(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    return {
+      id: 'enable', name: 'Bank', demo: false,
+      banks: (country = 'DK') => call('/banks?country=' + country).then(d => d.banks || []),
+      /** Returnerer en adresse hos banken, hvor brugeren godkender (MitID). */
+      start: (bank, redirect, state) => post('/connect', { bank, country: 'DK', redirect, state }).then(d => d.url),
+      /** Når brugeren kommer tilbage fra banken med en kode. */
+      finish: code => post('/session', { code }),
+      async fetchTransactions(from, to, info) {
+        const d = await call(`/transactions?session=${encodeURIComponent(info.session)}&from=${from}`);
+        return (d.transactions || []).filter(t => t.date <= to);
+      },
+      disconnect: info => call('/session?session=' + encodeURIComponent(info.session), { method: 'DELETE' }).catch(() => { }),
+    };
+  }
+  /** Slå rigtige banker til, hvis der er en bank-server i indstillingerne. */
+  function init(apiUrl) { if (apiUrl) PROVIDERS.enable = apiProvider(apiUrl); return !!apiUrl; }
+  const realBanks = () => !!PROVIDERS.enable;
+
+  /** Dage til bankens godkendelse udløber (EU-regel: højst 180 dage ad gangen). */
+  const consentDaysLeft = (s, today) => s.bank && s.bank.consentUntil ? Calc.daysBetween(today, s.bank.consentUntil.slice(0, 10)) : null;
+
   async function sync(s, today, uid) {
     if (!s.bank) return 0;
     const p = PROVIDERS[s.bank.provider];
     if (!p) return 0;
-    const from = s.bank.lastSync ? s.bank.lastSync : Calc.addDays(today, -59);
-    const list = await p.fetchTransactions(from, today);
+    const left = consentDaysLeft(s, today);
+    if (left !== null && left < 0) { const e = new Error('Your bank approval has run out'); e.code = 'expired'; throw e; }
+    // Hent lidt bagud hver gang, så sent bogførte køb også kommer med (dubletter springes over)
+    const from = s.bank.lastSync ? Calc.addDays(s.bank.lastSync, -5) : Calc.addDays(today, -59);
+    let list;
+    try { list = await p.fetchTransactions(from, today, s.bank); }
+    catch (e) { if (e.code === 'expired') s.bank.expired = true; throw e; }
     const added = merge(s, list, uid);
-    s.bank.lastSync = today; s.bank.lastSyncAt = new Date().toISOString();
+    s.bank.lastSync = today; s.bank.lastSyncAt = new Date().toISOString(); s.bank.expired = false;
     return added;
   }
-  function connect(s, providerId, today) {
+  function connect(s, providerId, today, info = {}) {
     const p = PROVIDERS[providerId];
-    s.bank = { provider: p.id, name: p.name, demo: !!p.demo, connectedAt: today, lastSync: null, lastSyncAt: null, consentUntil: Calc.addDays(today, 180) };
+    const keepTx = s.bank && s.bank.provider === providerId; // fornyelse: behold historik og synk-dato
+    s.bank = { provider: p.id, name: info.bank || p.name, demo: !!p.demo, connectedAt: today,
+      lastSync: keepTx ? s.bank.lastSync : null, lastSyncAt: keepTx ? s.bank.lastSyncAt : null,
+      consentUntil: (info.validUntil || Calc.addDays(today, 180)).slice(0, 10), session: info.session || null, accounts: info.accounts || [] };
   }
-  function disconnect(s, removeTx) {
+  async function disconnect(s, removeTx) {
+    const p = s.bank && PROVIDERS[s.bank.provider];
+    if (p && p.disconnect) await p.disconnect(s.bank);
     if (removeTx) s.tx = s.tx.filter(t => t.source !== 'bank');
     s.bank = null;
   }
 
-  return { RULES, COMING, PROVIDERS, categorize, merge, sync, connect, disconnect, demoDay };
+  return { RULES, COMING, PROVIDERS, init, realBanks, consentDaysLeft, categorize, merge, sync, connect, disconnect, demoDay };
 });

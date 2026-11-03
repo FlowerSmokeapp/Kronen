@@ -30,6 +30,13 @@ window.BUDGIE_CONFIG = {
   // (hvis din side hedder budgie.goatcounter.com). Tom = ingen måling.
   goatcounter: '',
 
+  // ---------- Bankforbindelse (kun Premium) ----------
+  // Adressen på din bank-server (se server/README.md), fx 'https://budgie-bank.dit-navn.workers.dev'
+  // Tom = kun Demo Bank.
+  bankApi: '',
+  bankSyncHours: 6,       // hvor ofte appen henter nye køb, mens den er åben
+  bankRenewDays: 14,      // mind brugeren om at forny godkendelsen X dage før den udløber
+
   // ---------- Indtægtstyper ----------
   incomeTypes: ['Salary', 'Pocket money', 'Student grant', 'Other'],
 
