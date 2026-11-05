@@ -7,7 +7,7 @@
      GET    /transactions?session=…&from=ÅÅÅÅ-MM-DD → { transactions: [{ext,date,text,amount}] }
      DELETE /session?session=…             → afbryd forbindelsen
    Hemmeligheder (sættes med `wrangler secret put`): EB_APP_ID, EB_PRIVATE_KEY
-   Indstilling (wrangler.toml): ALLOWED_ORIGIN = "https://flowersmokeapp.github.io" */
+   Indstilling (wrangler.toml): ALLOWED_ORIGIN = "https://dani-gh1.github.io" */
 
 const API = 'https://api.enablebanking.com';
 const enc = s => new TextEncoder().encode(s);

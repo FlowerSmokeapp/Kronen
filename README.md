@@ -12,10 +12,10 @@ Mobil-først PWA. Man opretter en konto, ser Premium-tilbuddet og kommer så ind
 3. Build → Firestore Database → Create database → location `eur3` → production mode
 4. Firestore → Rules → indsæt indholdet af `firestore.rules` → Publish
 5. Project settings → Your apps → Web (</>) → Register → kopiér config ind i `js/firebase-config.js`
-6. Authentication → Settings → Authorized domains → tilføj `flowersmokeapp.github.io`
+6. Authentication → Settings → Authorized domains → tilføj `dani-gh1.github.io`
 Appens sprog er engelsk; beløb vises i kroner, og datoer følger dansk tid (Europe/Copenhagen).
 
-Live: https://flowersmokeapp.github.io/Kronen/  (på computer vises appen i en telefonramme)
+Live: https://dani-gh1.github.io/Kronen/  (på computer vises appen i en telefonramme)
 
 ## Filer
 | Fil | Hvad den gør |

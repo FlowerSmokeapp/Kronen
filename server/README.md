@@ -13,7 +13,7 @@ Bankens nøgle ligger kun på serveren, aldrig i appen.
 ## Opsætning (ca. 20 min.)
 1. **Enable Banking:** Opret dig på enablebanking.com → *Control panel* → *Applications* → *Register new application*
    - Environment: **Production** (det er gratis i "restricted" tilstand)
-   - Redirect URL: `https://flowersmokeapp.github.io/Kronen/app.html`
+   - Redirect URL: `https://dani-gh1.github.io/Kronen/app.html`
    - Gem den private nøgle (`.pem`-fil) og notér **Application ID**
    - Tilføj din egen bankkonto under *Linked accounts* (så kan du teste gratis)
 2. **Cloudflare:** Opret en gratis konto på cloudflare.com

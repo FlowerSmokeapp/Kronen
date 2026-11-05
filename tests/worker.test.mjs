@@ -5,8 +5,8 @@ import worker, { mapTx, makeJWT } from '../server/worker.mjs';
 
 const pair = await crypto.subtle.generateKey({ name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' }, true, ['sign', 'verify']);
 const pkcs8 = Buffer.from(await crypto.subtle.exportKey('pkcs8', pair.privateKey)).toString('base64');
-const env = { EB_APP_ID: 'app-123', EB_PRIVATE_KEY: `-----BEGIN PRIVATE KEY-----\n${pkcs8}\n-----END PRIVATE KEY-----`, ALLOWED_ORIGIN: 'https://flowersmokeapp.github.io' };
-const ORIGIN = { Origin: 'https://flowersmokeapp.github.io' };
+const env = { EB_APP_ID: 'app-123', EB_PRIVATE_KEY: `-----BEGIN PRIVATE KEY-----\n${pkcs8}\n-----END PRIVATE KEY-----`, ALLOWED_ORIGIN: 'https://dani-gh1.github.io' };
+const ORIGIN = { Origin: 'https://dani-gh1.github.io' };
 const b64 = s => Buffer.from(s.replace(/-/g, '+').replace(/_/g, '/'), 'base64');
 
 test('JWT er signeret korrekt (RS256, kid = app-id)', async () => {
@@ -46,7 +46,7 @@ test('Hele forløbet: banker → godkend → session → køb (med flere sider)'
   const call = (path, init = {}) => worker.fetch(new Request('https://w.example' + path, { ...init, headers: { ...ORIGIN, 'Content-Type': 'application/json' } }), env).then(r => r.json());
 
   assert.deepEqual((await call('/banks?country=DK')).banks.map(b => b.name), ['Nordea']);
-  const c = await call('/connect', { method: 'POST', body: JSON.stringify({ bank: 'Nordea', redirect: 'https://flowersmokeapp.github.io/Kronen/app.html', state: 'st1' }) });
+  const c = await call('/connect', { method: 'POST', body: JSON.stringify({ bank: 'Nordea', redirect: 'https://dani-gh1.github.io/Kronen/app.html', state: 'st1' }) });
   assert.equal(c.url, 'https://bank.example/approve?x=1');
   const authBody = JSON.parse(calls.find(x => x.url.endsWith('/auth')).body);
   assert.equal(authBody.psu_type, 'personal'); assert.equal(authBody.aspsp.name, 'Nordea'); assert.equal(authBody.state, 'st1');

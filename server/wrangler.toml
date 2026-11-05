@@ -5,7 +5,7 @@ compatibility_date = "2024-09-01"
 
 [vars]
 # Kun appen må kalde serveren
-ALLOWED_ORIGIN = "https://flowersmokeapp.github.io"
+ALLOWED_ORIGIN = "https://dani-gh1.github.io"
 
 # Hemmeligheder sættes IKKE her, men med:
 #   npx wrangler secret put EB_APP_ID
